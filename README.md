@@ -88,3 +88,4 @@ In der Datei configuration.jsonc wird definiert, wie die App arbeitet.
         -   (4) go back
         -   (5) quit
 -   (3) quit
+
