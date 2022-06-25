@@ -125,6 +125,10 @@ export class Replacer {
         this.tokenOffset += replacement.length;
     }
 
+    getData(): string {
+        return this.data;
+    }
+
     private isFollowedByTrailingSequence(index: number): boolean {
         for (const sequence of this.validTrailSequences) {
             const sequenceLen = sequence.length;

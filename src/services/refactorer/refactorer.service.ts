@@ -165,7 +165,7 @@ export class RefactorService {
 
     private async replaceMediaReferences(
         command: RefactorCommand,
-        _mediaDirName: string,
+        mediaDirName: string,
         mediaFiles: string[],
         sourceFiles: string[],
     ): Promise<void> {
@@ -198,7 +198,7 @@ export class RefactorService {
             let fileLog = '';
 
             for (const mediaFile of mediaFiles) {
-                const replacement = _mediaDirName + '/' + mediaFile;
+                const replacement = mediaDirName + '/' + mediaFile;
                 this.replacer.setToken(mediaFile);
                 let tokenReplaceCount = 0;
                 while (this.replacer.hasMore()) {
@@ -225,7 +225,11 @@ export class RefactorService {
                 this.replacer.changes() > 0 &&
                 command === RefactorCommand.WetRun
             ) {
-                // save file
+                // save the file
+                await this.io.writeTextFile(
+                    sourceFilePath,
+                    this.replacer.getData(),
+                );
             }
         }
     }
