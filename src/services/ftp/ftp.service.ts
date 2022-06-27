@@ -90,7 +90,41 @@ export class FtpService implements OnModuleDestroy {
 
     private async findCaseConflicts(client: Client): Promise<void> {
         const tree = await this.getTree(client);
-        let report = '';
+        let reportFiles = '';
+        let reportDirs = '';
+
+        const findConflicts = (
+            parentPath: string,
+            hasName: { name: string }[],
+        ): string => {
+            if (!hasName) {
+                return '';
+            }
+
+            const lowercaseNames = hasName.map((value) =>
+                value.name.toLowerCase(),
+            );
+            const indexSkip: number[] = [];
+            let report = '';
+            for (let index = 0; index < hasName.length; index++) {
+                if (indexSkip.includes(index)) {
+                    continue;
+                }
+                const nameLC = hasName[index].name.toLowerCase();
+                let pos: number = lowercaseNames.indexOf(nameLC, index + 1);
+                if (pos !== -1) {
+                    report += parentPath + hasName[index].name + '\n';
+
+                    while (pos !== -1) {
+                        report += parentPath + hasName[pos].name + '\n';
+                        indexSkip.push(pos);
+                        pos = lowercaseNames.indexOf(nameLC, pos + 1);
+                    }
+                    report += '\n';
+                }
+            }
+            return report;
+        };
 
         const analyzeCaseConflicts = (
             parentPath: string,
@@ -98,36 +132,8 @@ export class FtpService implements OnModuleDestroy {
             dirs: Directory[] | undefined,
         ) => {
             //
-            if (files) {
-                const lowercaseFilenames = files.map((file) =>
-                    file.name.toLowerCase(),
-                );
-                const indexSkip: number[] = [];
-
-                for (let index = 0; index < files.length; index++) {
-                    if (indexSkip.includes(index)) {
-                        continue;
-                    }
-                    const filenameLC = files[index].name.toLowerCase();
-                    let pos: number = lowercaseFilenames.indexOf(
-                        filenameLC,
-                        index + 1,
-                    );
-                    if (pos !== -1) {
-                        report += parentPath + files[index].name + '\n';
-
-                        while (pos !== -1) {
-                            report += parentPath + files[pos].name + '\n';
-                            indexSkip.push(pos);
-                            pos = lowercaseFilenames.indexOf(
-                                filenameLC,
-                                pos + 1,
-                            );
-                        }
-                        report += '\n';
-                    }
-                }
-            }
+            reportFiles += findConflicts(parentPath, files);
+            reportDirs += findConflicts(parentPath, dirs);
 
             if (dirs) {
                 for (const dir of dirs) {
@@ -142,10 +148,19 @@ export class FtpService implements OnModuleDestroy {
 
         analyzeCaseConflicts('/', tree.files, tree.directories);
 
-        if (!report) {
-            report += 'none\n';
+        if (!reportFiles) {
+            reportFiles += 'none\n';
         }
-        report = '# Case Conflicts\n\n' + report;
+        if (!reportDirs) {
+            reportDirs += 'none\n';
+        }
+
+        const report =
+            '# Case Conflicts' +
+            '\n\n## DIRECTORIES\n\n' +
+            reportDirs +
+            '\n\n## FILES\n\n' +
+            reportFiles;
 
         const reportFilePath = this.io.join(
             this.config.workingDir,
