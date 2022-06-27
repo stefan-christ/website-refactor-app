@@ -49,6 +49,37 @@ export class CliService {
         });
     }
 
+    async secret(question: string): Promise<string> {
+        let description =
+            question +
+            this.lineSep +
+            'Enter nothing to abort operation.' +
+            this.lineSep;
+        const schema = {
+            properties: {
+                question: {
+                    description,
+                    hidden: true,
+                    replace: '*',
+                },
+            },
+        };
+        console.log('');
+        return new Promise<string>((resolve, reject) => {
+            prompt.get(schema, (err, result) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    if (!result.question) {
+                        resolve(undefined);
+                    } else {
+                        resolve(result.question as string);
+                    }
+                }
+            });
+        });
+    }
+
     async choose(question: string, options?: string[]): Promise<string> {
         let description = question;
         if (!!options) {

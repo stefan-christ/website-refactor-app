@@ -87,5 +87,11 @@ In der Datei configuration.jsonc wird definiert, wie die App arbeitet.
         -   (3) choose a different directory path
         -   (4) go back
         -   (5) quit
--   (3) quit
-
+-   (4) analyze FTP files
+    -   (1) find case conflicts
+    -   (2) find symbolic links
+    -   (3) find problematic characters
+    -   (4) dispose cached file info
+    -   (5) go back
+    -   (6) quit
+-   (5) quit

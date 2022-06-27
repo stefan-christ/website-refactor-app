@@ -1,4 +1,5 @@
 import { InjectionToken } from '@nestjs/common';
+import { FtpConfig } from '../ftp/ftp-config';
 
 export const CONFIG: InjectionToken = Symbol('CONFIG');
 
@@ -14,5 +15,6 @@ export interface Configuration {
         validLeadSequences: string[];
         validTrailSequences: string[];
     };
-    verboseLogging: boolean;
+    ftp?: FtpConfig;
+    verboseLogging?: boolean;
 }

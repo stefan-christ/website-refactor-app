@@ -1,3 +1,4 @@
+import { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { AppService } from './app.service';
@@ -5,10 +6,11 @@ import { Quit } from './services/quit-exception';
 
 console.log('application start');
 
-const bootstrap = async (): Promise<void> => {
+const bootstrap = async (): Promise<INestApplicationContext> => {
     const app = await NestFactory.createApplicationContext(AppModule, {
         bufferLogs: true,
     });
+    app.enableShutdownHooks();
 
     try {
         const appService = app.get(AppService);
@@ -18,8 +20,15 @@ const bootstrap = async (): Promise<void> => {
             throw error;
         }
     }
+    return app;
 };
 
 bootstrap()
-    .then(() => console.log('\n\napplication quit\n'))
-    .catch((error) => console.error('\n\napplication error\n', error));
+    .then(async (app: INestApplicationContext) => {
+        console.log('\n\napplication quit\n');
+        await app.close();
+    })
+    .catch((error) => {
+        console.error('\n\napplication error\n', error);
+        process.exit(0);
+    });

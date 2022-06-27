@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AnalyzerService } from './services/analyzer/analyzer.service';
 import { CliService } from './services/cli/cli.service';
 import { CONFIG, Configuration } from './services/configuration/configuration';
+import { FtpService } from './services/ftp/ftp.service';
 import { IoService } from './services/io/io.service';
 import { Quit } from './services/quit-exception';
 import { RefactorService } from './services/refactorer/refactorer.service';
@@ -13,6 +14,7 @@ export class AppService {
         @Inject(CONFIG) private readonly config: Configuration,
         private readonly analyzerService: AnalyzerService,
         private readonly refactorService: RefactorService,
+        private readonly ftpService: FtpService,
         private readonly io: IoService,
         private readonly cli: CliService,
     ) {}
@@ -21,6 +23,7 @@ export class AppService {
         if (!(await this.validateConfig())) {
             return;
         }
+
         return this.showMainMenu();
     }
 
@@ -44,6 +47,7 @@ export class AppService {
         const optionRefactorSourceFiles = 'refactor source files';
         const optionAnalyzeFileTypesWww = 'analyze file types (www dir)';
         const optionAnalyzeFileTypesCustom = 'analyze file types (custom dir)';
+        const optionAnalyzeFtpFiles = 'analyze FTP files';
         const optionQuit = 'quit';
 
         do {
@@ -53,6 +57,7 @@ export class AppService {
                     optionRefactorSourceFiles,
                     optionAnalyzeFileTypesWww,
                     optionAnalyzeFileTypesCustom,
+                    optionAnalyzeFtpFiles,
                     optionQuit,
                 ],
             );
@@ -69,6 +74,9 @@ export class AppService {
                     break;
                 case optionAnalyzeFileTypesCustom:
                     await this.analyzerService.showMainMenu('custom');
+                    break;
+                case optionAnalyzeFtpFiles:
+                    await this.ftpService.showMainMenu();
                     break;
                 default:
                     throw Quit;
