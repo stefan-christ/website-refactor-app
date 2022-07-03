@@ -1,12 +1,10 @@
 import { Module } from '@nestjs/common';
 
-import { CliModule } from '../cli/cli.module';
 import { ConfigurationModule } from '../configuration/configuration.module';
-import { IoModule } from '../io/io.module';
 import { FtpService } from './ftp.service';
 
 @Module({
-    imports: [ConfigurationModule, CliModule, IoModule],
+    imports: [ConfigurationModule],
     providers: [FtpService],
     exports: [FtpService],
 })

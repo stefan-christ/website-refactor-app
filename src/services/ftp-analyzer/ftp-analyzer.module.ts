@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
+
 import { CliModule } from '../cli/cli.module';
 import { ConfigurationModule } from '../configuration/configuration.module';
 import { FileProviderModule } from '../file-provider/file-provider.module';
 import { IoModule } from '../io/io.module';
-import { RefactorService } from './refactorer.service';
+import { FtpAnalyzerService } from './ftp-analyzer.service';
 
 @Module({
-    imports: [ConfigurationModule, FileProviderModule, IoModule, CliModule],
-    providers: [RefactorService],
-    exports: [RefactorService],
+    imports: [ConfigurationModule, CliModule, IoModule, FileProviderModule],
+    providers: [FtpAnalyzerService],
+    exports: [FtpAnalyzerService],
 })
-export class RefactorerModule {}
+export class FtpAnalyzerModule {}

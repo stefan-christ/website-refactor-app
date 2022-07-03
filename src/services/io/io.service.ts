@@ -2,11 +2,27 @@ import { Injectable } from '@nestjs/common';
 import * as fs from 'fs';
 import { jsonc } from 'jsonc';
 import * as path from 'path';
+import { Directory, File, Link } from '../file-provider/file-model';
 
 @Injectable()
 export class IoService {
     get sep(): string {
         return path.sep;
+    }
+
+    getFileExtension(fileName: string): string {
+        let extension = path.extname(fileName);
+        if (extension === '') {
+            if (fileName.startsWith('.')) {
+                extension = fileName;
+            }
+        }
+        return extension;
+    }
+
+    getNameFromPath(fileOrDirPath: string): string {
+        const normalized = path.normalize(fileOrDirPath);
+        return path.basename(normalized);
     }
 
     join(...pathSegments: string[]): string {
@@ -94,22 +110,14 @@ export class IoService {
         return jsonc.parse(text);
     }
 
-    async listFiles(
-        dirPath: string,
-        options: {
-            recursive: boolean;
-            relative: boolean;
-            includedExtensions?: string[];
-            excludedExtensions?: string[];
-        },
-    ): Promise<string[]> {
-        const normalized = path.normalize(dirPath);
-
-        let resultFiles: string[] = [];
-        const recursion = async (pathToDir: string): Promise<void> => {
+    async getTree(dirPath: string): Promise<Directory> {
+        const recursion = async (
+            parentDirectory: Directory,
+            dirPath: string,
+        ): Promise<void> => {
             await new Promise<void>((resolve, reject) => {
                 fs.readdir(
-                    pathToDir,
+                    dirPath,
                     {
                         encoding: 'utf-8',
                         withFileTypes: true,
@@ -118,125 +126,70 @@ export class IoService {
                         if (err) {
                             reject(err);
                         } else {
-                            const files = dirents
-                                .filter((dirent) => {
-                                    if (!dirent.isFile()) {
-                                        return false;
-                                    }
-                                    const direntExtension =
-                                        this.getFileExtension(dirent.name);
-
-                                    let included = true;
-                                    if (
-                                        included &&
-                                        options.includedExtensions !== undefined
-                                    ) {
-                                        included =
-                                            options.includedExtensions.includes(
-                                                direntExtension,
-                                            );
-                                    }
-
-                                    if (
-                                        included &&
-                                        options.excludedExtensions !== undefined
-                                    ) {
-                                        included =
-                                            !options.excludedExtensions.includes(
-                                                direntExtension,
-                                            );
-                                    }
-                                    return included;
-                                })
-                                .map((dirent) =>
-                                    path.join(pathToDir, dirent.name),
-                                );
-                            resultFiles.push(...files);
-
-                            if (options.recursive) {
-                                const dirs = dirents.filter((dirent) =>
-                                    dirent.isDirectory(),
-                                );
-                                for (const dir of dirs) {
-                                    await recursion(
-                                        path.join(pathToDir, dir.name),
-                                    );
-                                }
-                            }
-                            resolve();
-                        }
-                    },
-                );
-            });
-        };
-
-        await recursion(normalized);
-
-        if (options.relative) {
-            const normalizedDirPathLength = normalized.length;
-            resultFiles = resultFiles.map((file) =>
-                file.substring(normalizedDirPathLength + 1),
-            );
-        }
-
-        return resultFiles.sort();
-    }
-
-    getFileExtension(fileName: string): string {
-        let extension = path.extname(fileName);
-        if (extension === '') {
-            if (fileName.startsWith('.')) {
-                extension = fileName;
-            }
-        }
-        return extension;
-    }
-
-    async getFileExtensionList(
-        dirPath: string,
-        recursive: boolean,
-    ): Promise<string[]> {
-        const normalized = path.normalize(dirPath);
-
-        const types: string[] = [];
-
-        const recursion = async (pathToDir: string): Promise<void> => {
-            // console.log('IoService.getFileTypes. Scanning', pathToDir);
-            await new Promise<void>((resolve, reject) => {
-                fs.readdir(
-                    pathToDir,
-                    {
-                        encoding: 'utf-8',
-                        withFileTypes: true,
-                    },
-                    async (err, dirents) => {
-                        if (err) {
-                            reject(err);
-                        } else {
-                            const files = dirents.filter((dirent) =>
-                                dirent.isFile(),
+                            const parentPath = this.join(
+                                parentDirectory.parentPath,
+                                parentDirectory.name,
+                                this.sep,
                             );
 
-                            for (const file of files) {
-                                let extension = this.getFileExtension(
-                                    file.name,
-                                );
+                            const files = dirents.filter(
+                                (dirent) =>
+                                    dirent.isFile() && !dirent.isSymbolicLink(),
+                            );
+                            const dirs = dirents.filter(
+                                (dirent) =>
+                                    dirent.isDirectory() &&
+                                    !dirent.isSymbolicLink(),
+                            );
+                            const links = dirents.filter((dirent) =>
+                                dirent.isSymbolicLink(),
+                            );
 
-                                if (!types.includes(extension)) {
-                                    types.push(extension);
-                                }
+                            if (links && links.length > 0) {
+                                parentDirectory.links = links.map<Link>(
+                                    (dirent) => {
+                                        return {
+                                            name: dirent.name,
+                                            parentPath,
+                                        };
+                                    },
+                                );
                             }
 
-                            if (recursive) {
-                                const dirs = dirents.filter((dirent) =>
-                                    dirent.isDirectory(),
+                            if (files && files.length > 0) {
+                                parentDirectory.files = files.map<File>(
+                                    (dirent) => {
+                                        return {
+                                            name: dirent.name,
+                                            parentPath,
+                                            extension: this.getFileExtension(
+                                                dirent.name,
+                                            ),
+                                        };
+                                    },
                                 );
-                                for (const dir of dirs) {
+                            }
+
+                            if (dirs && dirs.length > 0) {
+                                parentDirectory.directories =
+                                    dirs.map<Directory>((dirent) => {
+                                        return {
+                                            name: dirent.name,
+                                            parentPath,
+                                        };
+                                    });
+
+                                for (const containerDir of parentDirectory.directories) {
                                     await recursion(
-                                        path.join(pathToDir, dir.name),
+                                        containerDir,
+                                        this.join(
+                                            containerDir.parentPath,
+                                            containerDir.name,
+                                        ),
                                     );
                                 }
                             }
+
                             resolve();
                         }
                     },
@@ -244,8 +197,13 @@ export class IoService {
             });
         };
 
-        await recursion(normalized);
-
-        return types.sort();
+        const normalized = path.normalize(dirPath) + this.sep;
+        const tree: Directory = {
+            name: this.getNameFromPath(normalized),
+            parentPath: this.join(path.dirname(normalized), this.sep),
+        };
+        console.log('tree', tree);
+        await recursion(tree, normalized);
+        return tree;
     }
 }

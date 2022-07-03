@@ -3,7 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AnalyzerService } from './services/analyzer/analyzer.service';
 import { CliService } from './services/cli/cli.service';
 import { CONFIG, Configuration } from './services/configuration/configuration';
-import { FtpService } from './services/ftp/ftp.service';
+import { FtpAnalyzerService } from './services/ftp-analyzer/ftp-analyzer.service';
 import { IoService } from './services/io/io.service';
 import { Quit } from './services/quit-exception';
 import { RefactorService } from './services/refactorer/refactorer.service';
@@ -14,7 +14,7 @@ export class AppService {
         @Inject(CONFIG) private readonly config: Configuration,
         private readonly analyzerService: AnalyzerService,
         private readonly refactorService: RefactorService,
-        private readonly ftpService: FtpService,
+        private readonly ftpAnalyzerService: FtpAnalyzerService,
         private readonly io: IoService,
         private readonly cli: CliService,
     ) {}
@@ -48,6 +48,7 @@ export class AppService {
         const optionAnalyzeFileTypesWww = 'analyze file types (www dir)';
         const optionAnalyzeFileTypesCustom = 'analyze file types (custom dir)';
         const optionAnalyzeFtpFiles = 'analyze FTP files';
+        const optionDetectFileEncodings = 'detect file enccodings';
         const optionQuit = 'quit';
 
         do {
@@ -58,6 +59,7 @@ export class AppService {
                     optionAnalyzeFileTypesWww,
                     optionAnalyzeFileTypesCustom,
                     optionAnalyzeFtpFiles,
+                    optionDetectFileEncodings,
                     optionQuit,
                 ],
             );
@@ -76,7 +78,10 @@ export class AppService {
                     await this.analyzerService.showMainMenu('custom');
                     break;
                 case optionAnalyzeFtpFiles:
-                    await this.ftpService.showMainMenu();
+                    await this.ftpAnalyzerService.showMainMenu();
+                    break;
+                case optionDetectFileEncodings:
+                    await this.ftpAnalyzerService.showMainMenu();
                     break;
                 default:
                     throw Quit;

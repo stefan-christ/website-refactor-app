@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CONFIG, Configuration } from '../configuration/configuration';
 
 import { CliService } from '../cli/cli.service';
+import { FileProviderService } from '../file-provider/file-provider.service';
 import { IoService } from '../io/io.service';
 import { Quit } from '../quit-exception';
 import { Replacer } from './replacer';
@@ -21,6 +22,7 @@ export class RefactorService {
 
     constructor(
         @Inject(CONFIG) private readonly config: Configuration,
+        private readonly fileProvider: FileProviderService,
         private readonly io: IoService,
         private readonly cli: CliService,
     ) {
@@ -41,14 +43,13 @@ export class RefactorService {
                 ? undefined
                 : this.config.refactor.replacementExclusionFileTypes;
 
-        const mediaFiles = await this.io.listFiles(
-            this.io.join(this.config.wwwDir, mediaDirName),
-            {
-                recursive: true,
-                relative: true,
-                excludedExtensions,
-            },
-        );
+        const tree = await this.fileProvider.getLocalTree(this.config.wwwDir);
+
+        const mediaFiles = await this.fileProvider.listFileNames(tree, {
+            recursive: true,
+            relative: true,
+            excludedExtensions,
+        });
 
         if (mediaFiles.length === 0) {
             await this.cli.prompt(
@@ -58,7 +59,7 @@ export class RefactorService {
         }
 
         const sourceFiles = (
-            await this.io.listFiles(this.config.wwwDir, {
+            await this.fileProvider.listFileNames(tree, {
                 recursive: true,
                 relative: true,
                 includedExtensions: this.config.refactor.sourceFileTypes,

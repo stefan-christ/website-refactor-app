@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import { CliService } from '../cli/cli.service';
 import { CONFIG, Configuration } from '../configuration/configuration';
+import { FileProviderService } from '../file-provider/file-provider.service';
 import { IoService } from '../io/io.service';
 import { Quit } from '../quit-exception';
 
@@ -9,23 +10,28 @@ import { Quit } from '../quit-exception';
 export class AnalyzerService {
     constructor(
         @Inject(CONFIG) private readonly config: Configuration,
+        private readonly fileProvider: FileProviderService,
         private readonly io: IoService,
         private readonly cli: CliService,
     ) {}
 
     async showMainMenu(mode: 'www' | 'custom'): Promise<void> {
+        const optionWriteTreeFile = 'write tree file';
         const optionNonRecursively = 'non-recursive';
         const optionRecursively = 'recursive';
         const optionChoosePath = 'choose a different custom directory path';
         const optionGoBack = 'go back';
         const optionQuit = 'quit';
 
+        let treeFile: string;
         let analysisFile: string;
         let options: string[];
 
         if (mode === 'www') {
             analysisFile = 'file-analysis-www-dir';
+            treeFile = 'file-tree-www-dir.json';
             options = [
+                optionWriteTreeFile,
                 optionNonRecursively,
                 optionRecursively,
                 optionGoBack,
@@ -33,7 +39,9 @@ export class AnalyzerService {
             ];
         } else {
             analysisFile = 'file-analysis-custom-dir';
+            treeFile = 'file-tree-custom-dir.json';
             options = [
+                optionWriteTreeFile,
                 optionNonRecursively,
                 optionRecursively,
                 optionChoosePath,
@@ -62,6 +70,9 @@ export class AnalyzerService {
             );
 
             switch (option) {
+                case optionWriteTreeFile:
+                    await this.writeTreeFile(targetPath, treeFile);
+                    break;
                 case optionNonRecursively:
                     await this.analyzeFileTypes(
                         targetPath,
@@ -87,6 +98,15 @@ export class AnalyzerService {
                     return;
             }
         } while (true);
+    }
+
+    private async writeTreeFile(
+        targetPath: string,
+        treeFile: string,
+    ): Promise<void> {
+        const tree = await this.fileProvider.getLocalTree(targetPath);
+        const reportFilePath = this.io.join(this.config.workingDir, treeFile);
+        await this.io.writeJsonFile(reportFilePath, tree);
     }
 
     private async requestDirectoryPath(): Promise<string | undefined> {
@@ -123,10 +143,9 @@ export class AnalyzerService {
             `${operation}.json`,
         );
 
-        const types = await this.io.getFileExtensionList(
-            rootDirectoryPath,
-            recursive,
-        );
+        const tree = await this.fileProvider.getLocalTree(rootDirectoryPath);
+
+        const types = this.fileProvider.getFileExtensionList(tree, recursive);
 
         await this.io.writeJsonFile(analysisFilePath, types);
         console.log('file types in root', types);
@@ -139,11 +158,12 @@ export class AnalyzerService {
         for (let index = 0; index < types.length; index++) {
             const type = types[index];
             const fileIndex = `${index + 1}`.padStart(2, '0');
-            const fileList = await this.io.listFiles(rootDirectoryPath, {
+            const fileList = await this.fileProvider.listFileNames(tree, {
                 recursive,
                 relative: true,
                 includedExtensions: [type],
             });
+
             const fileName = type === '' ? 'no extension' : type.substring(1);
             const jsonFile = this.io.join(
                 analysisDirPath,
