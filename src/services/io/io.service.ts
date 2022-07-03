@@ -10,6 +10,16 @@ export class IoService {
         return path.sep;
     }
 
+    getTimestamp(): string {
+        let ts = new Date()
+            .toISOString()
+            .replace('T', ' ')
+            .replace(':', '.')
+            .replace(':', '.')
+            .substring(0, 19);
+        return ts;
+    }
+
     getFileExtension(fileName: string): string {
         let extension = path.extname(fileName);
         if (extension === '') {

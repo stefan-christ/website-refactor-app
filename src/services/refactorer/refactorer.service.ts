@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CONFIG, Configuration } from '../configuration/configuration';
 
 import { CliService } from '../cli/cli.service';
+import { Directory } from '../file-provider/file-model';
 import { FileProviderService } from '../file-provider/file-provider.service';
 import { IoService } from '../io/io.service';
 import { Quit } from '../quit-exception';
@@ -33,6 +34,32 @@ export class RefactorService {
         );
     }
 
+    private async getMediaFileNames(
+        tree: Directory,
+        mediaDirName: string,
+        excludedExtensions: string[],
+    ): Promise<string[]> {
+        const mediaDir = tree.directories?.find(
+            (dir) => dir.name === mediaDirName,
+        );
+        if (!mediaDir) {
+            throw new Error('media dir does not exist');
+        }
+
+        const mediaFiles = await this.fileProvider.listFileNames(mediaDir, {
+            recursive: true,
+            relative: true,
+            excludedExtensions,
+        });
+
+        if (mediaFiles.length === 0) {
+            throw new Error(
+                'no matching media files found in media directory.',
+            );
+        }
+        return mediaFiles;
+    }
+
     private async refactorSourceFiles(
         mediaDirName: string,
         command: RefactorCommand,
@@ -43,18 +70,19 @@ export class RefactorService {
                 ? undefined
                 : this.config.refactor.replacementExclusionFileTypes;
 
-        const tree = await this.fileProvider.getLocalTree(this.config.wwwDir);
-
-        const mediaFiles = await this.fileProvider.listFileNames(tree, {
-            recursive: true,
-            relative: true,
-            excludedExtensions,
-        });
-
-        if (mediaFiles.length === 0) {
-            await this.cli.prompt(
-                'no matching media files found in media directory.',
+        const tree = await this.fileProvider.getLocalTree(
+            this.config.wwwDir,
+            true,
+        );
+        let mediaFiles: string[];
+        try {
+            mediaFiles = await this.getMediaFileNames(
+                tree,
+                mediaDirName,
+                excludedExtensions,
             );
+        } catch (error) {
+            await this.cli.prompt(error.message);
             return;
         }
 
@@ -134,13 +162,13 @@ export class RefactorService {
         const reportDirPath = this.io.join(this.config.workingDir, reportDir);
         await this.io.ensureDirectory(reportDirPath);
 
-        const ts = new Date().toISOString().replace(':', ' ');
+        const ts = this.io.getTimestamp();
 
         if (!this.reportOperations) {
             this.reportOperations = 'no operations';
         }
         await this.io.writeTextFile(
-            this.io.join(reportDirPath, `${ts}-operations.log`),
+            this.io.join(reportDirPath, `${ts} operations.log`),
             this.reportOperations,
         );
 
@@ -148,7 +176,7 @@ export class RefactorService {
             this.reportErrors = 'no errors';
         }
         await this.io.writeTextFile(
-            this.io.join(reportDirPath, `${ts}-errors.log`),
+            this.io.join(reportDirPath, `${ts} errors.log`),
             this.reportErrors,
         );
     }

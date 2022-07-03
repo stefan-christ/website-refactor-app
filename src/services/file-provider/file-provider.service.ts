@@ -112,8 +112,8 @@ export class FileProviderService {
         return fileNames.sort();
     }
 
-    async getRemoteTree(): Promise<Directory> {
-        if (!this.remoteTree) {
+    async getRemoteTree(forceRefresh?: boolean): Promise<Directory> {
+        if (!this.remoteTree || forceRefresh) {
             this.remoteTree = await this.ftp.getTree();
         }
         return this.remoteTree;
@@ -123,9 +123,12 @@ export class FileProviderService {
         this.remoteTree = undefined;
     }
 
-    async getLocalTree(dirPath: string): Promise<Directory> {
+    async getLocalTree(
+        dirPath: string,
+        forceRefresh?: boolean,
+    ): Promise<Directory> {
         let localTree: Directory = this.localTreeMap.get(dirPath);
-        if (!localTree) {
+        if (!localTree || forceRefresh) {
             localTree = await this.io.getTree(dirPath);
             this.localTreeMap.set(dirPath, localTree);
         }
