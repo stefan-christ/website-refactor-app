@@ -4,7 +4,9 @@ import { AppModule } from './app.module';
 import { AppService } from './app.service';
 import { Quit } from './quit-exception';
 
-console.log('application start');
+console.log('************************');
+console.log('* WEBSITE REFACTOR APP *');
+console.log('************************');
 
 const bootstrap = async (): Promise<INestApplicationContext> => {
     const app = await NestFactory.createApplicationContext(AppModule, {
@@ -25,10 +27,10 @@ const bootstrap = async (): Promise<INestApplicationContext> => {
 
 bootstrap()
     .then(async (app: INestApplicationContext) => {
-        console.log('\n\napplication quit\n');
+        console.log('\n\nBye-bye...\n');
         await app.close();
     })
     .catch((error) => {
-        console.error('\n\napplication error\n', error);
+        console.error('\n\nOops, an error!\n', error);
         process.exit(0);
     });
