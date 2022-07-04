@@ -3,7 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AppConfig, APP_CONFIG } from '../../app-config';
 import { Quit } from '../../quit-exception';
 import { CliService, Option, OPTION_QUIT } from '../cli/cli.service';
-import { Directory } from '../file-provider/file-model';
+import { Directory, File, Tree } from '../file-provider/file-model';
 import { FileProviderService } from '../file-provider/file-provider.service';
 import { IoService } from '../io/io.service';
 import { Replacer } from './replacer';
@@ -13,6 +13,8 @@ enum RefactorCommand {
     WetRun = 'wet run',
     CheckConditions = 'check conditions',
 }
+
+const MENU_NAME = 'REFACTOR MENU';
 
 @Injectable()
 export class RefactorService {
@@ -64,6 +66,7 @@ export class RefactorService {
     }
 
     private async refactorSourceFiles(
+        tree: Tree,
         mediaFolder: string,
         command: RefactorCommand,
     ): Promise<void> {
@@ -74,7 +77,6 @@ export class RefactorService {
                 ? undefined
                 : this.configuration.refactor.replacementExclusionFileTypes;
 
-        const tree = await this.fileProvider.getWwwTree(true);
         let mediaFiles: string[];
         try {
             mediaFiles = await this.getMediaFileNames(
@@ -88,16 +90,22 @@ export class RefactorService {
         }
 
         const sourceFiles = (
-            await this.fileProvider.listFileNames(tree, {
+            await this.fileProvider.listFiles(tree, {
                 recursive: true,
-                relative: true,
+                // relative: true,
                 includedExtensions: this.configuration.refactor.sourceFileTypes,
             })
-        ).filter((fileName) => !fileName.startsWith(mediaFolder + this.io.sep));
+        ).filter((sourceFile) => {
+            const filePath = this.fileProvider.relativePath(
+                sourceFile.parentPath + sourceFile.name,
+                tree,
+            );
+            return !filePath.startsWith(mediaFolder + this.io.sep);
+        });
 
         if (sourceFiles.length === 0) {
             await this.cli.prompt(
-                'no matching source files found in www directory.',
+                'no matching source files found in source directory.',
             );
             return;
         }
@@ -136,6 +144,7 @@ export class RefactorService {
         }
 
         await this.replaceMediaReferences(
+            tree,
             command,
             mediaFolder,
             mediaFiles,
@@ -195,10 +204,11 @@ export class RefactorService {
     }
 
     private async replaceMediaReferences(
+        tree: Tree,
         command: RefactorCommand,
         mediaDirName: string,
         mediaFiles: string[],
-        sourceFiles: string[],
+        sourceFiles: File[],
     ): Promise<void> {
         let counter = 0;
         const total = sourceFiles.length;
@@ -212,23 +222,28 @@ export class RefactorService {
         };
 
         for (const sourceFile of sourceFiles) {
+            const relativeFilePath = this.fileProvider.relativePath(
+                sourceFile.parentPath + sourceFile.name,
+                tree,
+            );
+
             counter++;
             this.writeOperation(
                 false,
                 counter + ' of ' + total + ' — checking source: ',
-                sourceFile,
+                relativeFilePath,
             );
 
             const sourceFilePath = this.io.join(
-                this.configuration.wwwDir,
-                sourceFile,
+                sourceFile.parentPath,
+                sourceFile.name,
             );
             const source = await this.io.readTextFile(sourceFilePath);
             if (!source) {
                 continue;
             }
 
-            this.replacer.init(sourceFile, source);
+            this.replacer.init(relativeFilePath, source);
             let fileLog = '';
 
             for (const mediaFile of mediaFiles) {
@@ -289,10 +304,19 @@ export class RefactorService {
     }
 
     async showMainMenu(origin: string): Promise<void> {
+        let tree = await this.fileProvider.getSafeLocalTree(MENU_NAME);
+        if (!tree) {
+            return;
+        }
+
         let mediaFolder = this.currentMediaFolder;
+        if (!!mediaFolder) {
+            mediaFolder = await this.requestMediaFolder(tree);
+        }
+
         do {
             if (!mediaFolder) {
-                mediaFolder = await this.requestMediaDirName();
+                mediaFolder = await this.requestMediaFolder(tree);
             }
             if (!mediaFolder) {
                 return;
@@ -306,8 +330,10 @@ export class RefactorService {
                 }
                 if (command === 'choose folder') {
                     mediaFolder = undefined;
+                    tree = await this.fileProvider.getSafeLocalTree(MENU_NAME);
                 } else {
                     await this.refactorSourceFiles(
+                        tree,
                         this.currentMediaFolder,
                         command,
                     );
@@ -320,8 +346,6 @@ export class RefactorService {
         mediaFolder: string,
         origin: string,
     ): Promise<RefactorCommand | 'choose folder' | undefined> {
-        const menuName = 'REFACTOR MENU';
-
         const optionCheckConditions: Option = {
             answer: 'Check conditions',
             choice: '1',
@@ -347,7 +371,7 @@ export class RefactorService {
             const optionFileMenu = this.fileProvider.optionFileMenu;
 
             const option = await this.cli.choose(
-                menuName,
+                MENU_NAME,
                 // `Choose an action to perform on media folder '${mediaFolder}'?`,
                 undefined,
                 [
@@ -375,8 +399,16 @@ export class RefactorService {
 
                 case optionFileMenu.answer:
                     await this.fileProvider.showFileMenu({
-                        origin: menuName,
+                        origin: MENU_NAME,
+                        disallowFtp: true,
                     });
+                    const tree = await this.fileProvider.getCurrentTree();
+                    if (!this.doesMediaFolderExist(tree, mediaFolder)) {
+                        this.cli.prompt(
+                            `Media folder '${mediaFolder}' does not exist in this file source.`,
+                        );
+                        return 'choose folder';
+                    }
                     break;
                 case optionGoBack.answer:
                     return undefined;
@@ -388,31 +420,38 @@ export class RefactorService {
         } while (true);
     }
 
-    private async requestMediaDirName(): Promise<string | undefined> {
-        let mediaDirName: string;
+    private async requestMediaFolder(tree: Tree): Promise<string | undefined> {
+        let mediaFolder: string;
 
         do {
-            mediaDirName = await this.cli.request(
+            mediaFolder = await this.cli.request(
                 'Enter name of a media folder located in the current root directory',
             );
-            if (!mediaDirName) {
+            if (!mediaFolder) {
                 return undefined;
             } else {
                 try {
-                    const mediaDirPath = this.io.join(
-                        this.configuration.wwwDir,
-                        mediaDirName,
-                    );
-                    if (!this.io.pathExists(mediaDirPath)) {
-                        throw new Error('path not exists');
+                    if (!this.doesMediaFolderExist(tree, mediaFolder)) {
+                        throw new Error(
+                            `Media folder '${mediaFolder}' does not exist.`,
+                        );
                     }
                 } catch (error) {
-                    this.cli.prompt('The path could not be resolved.');
-                    mediaDirName = undefined;
+                    this.cli.prompt(error.message);
+                    mediaFolder = undefined;
                 }
             }
-        } while (!mediaDirName);
+        } while (!mediaFolder);
 
-        return mediaDirName;
+        return mediaFolder;
+    }
+
+    private doesMediaFolderExist(tree: Tree, mediaFolder: string): boolean {
+        const dir = tree.directories?.find((dir) => dir.name === mediaFolder);
+        if (!dir) {
+            return false;
+        }
+        const mediaFolderPath = this.io.join(dir.parentPath, dir.name);
+        return this.io.pathExists(mediaFolderPath);
     }
 }

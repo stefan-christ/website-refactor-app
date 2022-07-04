@@ -7,6 +7,8 @@ import { Directory, File, Link } from '../file-provider/file-model';
 import { FileProviderService } from '../file-provider/file-provider.service';
 import { IoService } from '../io/io.service';
 
+const MENU_NAME = 'ANALYZER MENU';
+
 @Injectable()
 export class AnalyzerService {
     constructor(
@@ -17,8 +19,6 @@ export class AnalyzerService {
     ) {}
 
     async showMainMenu(origin: string): Promise<void> {
-        const menuName = 'ANALYZER MENU';
-
         const optionNonRecursively: Option = {
             answer: 'file types (non-recursive)',
             choice: '1',
@@ -36,11 +36,11 @@ export class AnalyzerService {
             choice: '4',
         };
         const optionFindProblematicCharacters: Option = {
-            answer: 'problematic characters',
+            answer: 'problematic file name characters',
             choice: '5',
         };
         const optionDetectFileEncodings: Option = {
-            answer: 'detect file encodings',
+            answer: 'detect file encodings (not on FTP)',
             choice: '6',
         };
         const optionWriteTreeFile: Option = {
@@ -79,7 +79,7 @@ export class AnalyzerService {
                 ts = this.io.getTimestamp() + ' ';
             }
 
-            const option = await this.cli.choose(menuName, undefined, options);
+            const option = await this.cli.choose(MENU_NAME, undefined, options);
             let optionsToPerform: string[] = [];
             if (option === optionAll.answer) {
                 optionsToPerform.push(
@@ -89,10 +89,12 @@ export class AnalyzerService {
                         optionFindCaseConflicts.answer,
                         optionFindSymbolicLinks.answer,
                         optionFindProblematicCharacters.answer,
-                        optionDetectFileEncodings.answer,
                         optionWriteTreeFile.answer,
                     ],
                 );
+                if (this.fileProvider.getCurrentType() !== 'ftp') {
+                    optionsToPerform.push(optionDetectFileEncodings.answer);
+                }
             } else {
                 optionsToPerform.push(option);
             }
@@ -124,7 +126,7 @@ export class AnalyzerService {
 
                     case optionFileMenu.answer:
                         await this.fileProvider.showFileMenu({
-                            origin: menuName,
+                            origin: MENU_NAME,
                         });
                         break;
                     case optionGoBack.answer:
@@ -276,7 +278,52 @@ export class AnalyzerService {
     }
 
     private async detectFileEncodings(timestamp: string): Promise<void> {
-        //
+        const tree = await this.fileProvider.getSafeLocalTree(MENU_NAME);
+        if (!tree) {
+            return;
+        }
+
+        const sourceFileNames = await this.fileProvider.listFileNames(tree, {
+            recursive: true,
+            relative: true,
+            includedExtensions: this.configuration.refactor.sourceFileTypes,
+        });
+
+        const detectFileEncodings = (
+            parentPath: string,
+            files: File[] | undefined,
+            dirs: Directory[] | undefined,
+        ) => {
+            if (files) {
+                for (const file of files) {
+                    // const problematic = getProblematicCharacters(file.name);
+                    // if (problematic) {
+                    //     reportFiles += parentPath + file.name + '\n';
+                    //     reportFiles +=
+                    //         "   '" + problematic.join("'\n   ") + "'\n";
+                    // }
+                }
+            }
+            if (dirs) {
+                for (const dir of dirs) {
+                    detectFileEncodings(
+                        parentPath + dir.name + '/',
+                        dir.files,
+                        dir.directories,
+                    );
+                }
+            }
+        };
+
+        detectFileEncodings('/', tree.files, tree.directories);
+
+        const reportSummary = '';
+
+        const reportPath = this.io.join(
+            await this.fileProvider.getReportDirPath(),
+            `${timestamp}analyzer-file-encodings.md`,
+        );
+        await this.io.writeTextFile(reportPath, reportSummary);
     }
 
     private async findProblematicCharacters(timestamp: string): Promise<void> {

@@ -75,21 +75,68 @@ export class FileProviderService {
         return this.currentType;
     }
 
+    async getSafeLocalTree(origin: string): Promise<Tree | undefined> {
+        if (this.currentType === 'ftp') {
+            const fileMenuOption = this.optionFileMenu;
+            const goBackOption = this.cli.getOptionGoBack(origin);
+            const chosen = await this.cli.choose(
+                'This command cannot be executed on FTP server.',
+                'You can switch to a different file source.',
+                [fileMenuOption, goBackOption, OPTION_QUIT],
+            );
+            if (!chosen) {
+                return undefined;
+            }
+            switch (chosen) {
+                case fileMenuOption.answer:
+                    await this.showFileMenu({ origin, disallowFtp: true });
+                    if (this.currentType === 'ftp') {
+                        return undefined;
+                    } else {
+                        return this.currentTree;
+                    }
+                case goBackOption.answer:
+                    return undefined;
+                case OPTION_QUIT.answer:
+                    throw Quit;
+
+                default:
+                    return undefined;
+            }
+        } else {
+            return this.currentTree;
+        }
+    }
+
     async getCurrentTree(): Promise<Tree | undefined> {
         return this.currentTree;
     }
 
-    async showFileMenu(menuOptions: { origin?: string }): Promise<void> {
+    async showFileMenu(menuOptions: {
+        origin?: string;
+        disallowFtp?: boolean;
+    }): Promise<void> {
         const optionSelectFtp: Option = {
             answer: 'Select file source: FTP',
-            choice: '1',
+            choice: '',
         };
         const optionSelectWww: Option = {
             answer: 'Select file source: WWW directory',
-            choice: '2',
+            choice: '',
         };
 
-        const options: Option[] = [optionSelectFtp, optionSelectWww];
+        const options: Option[] = [];
+
+        let choiceIndex = 0;
+        if (!menuOptions.disallowFtp) {
+            choiceIndex++;
+            optionSelectFtp.choice = '' + choiceIndex;
+            options.push(optionSelectFtp);
+        }
+        choiceIndex++;
+        optionSelectWww.choice = '' + choiceIndex;
+        options.push(optionSelectWww);
+
         const choiceOffset = options.length;
         let choice = choiceOffset;
         const customs = Array.from(this.localTreeMap.keys());
@@ -294,20 +341,23 @@ export class FileProviderService {
             includedExtensions: options.includedExtensions,
         });
 
-        let fileNames: string[] = files.map<string>(
+        let filePaths: string[] = files.map<string>(
             (file) => file.parentPath + file.name,
         );
 
         if (options.relative) {
-            const normalizedDirPathLength = (
-                directory.parentPath + directory.name
-            ).length;
-            fileNames = fileNames.map((file) =>
-                file.substring(normalizedDirPathLength + 1),
+            filePaths = filePaths.map((filePath) =>
+                this.relativePath(filePath, directory),
             );
         }
 
-        return fileNames.sort();
+        return filePaths.sort();
+    }
+
+    relativePath(fileOrDirPath: string, rootDir: Directory): string {
+        const normalizedDirPathLength = (rootDir.parentPath + rootDir.name)
+            .length;
+        return fileOrDirPath.substring(normalizedDirPathLength + 1);
     }
 
     private async getRemoteTree(forceRefresh?: boolean): Promise<Tree> {
@@ -317,19 +367,19 @@ export class FileProviderService {
         return this.remoteTree;
     }
 
-    private disposeRemoteTree(): void {
-        this.remoteTree = undefined;
-    }
-    async getWwwTree(forceRefresh?: boolean): Promise<Tree> {
+    // private disposeRemoteTree(): void {
+    //     this.remoteTree = undefined;
+    // }
+    private async getWwwTree(forceRefresh?: boolean): Promise<Tree> {
         if (!this.wwwTree || forceRefresh) {
             this.wwwTree = await this.io.getTree(this.configuration.wwwDir);
         }
         return this.wwwTree;
     }
 
-    private disposeWwwTree(): void {
-        this.wwwTree = undefined;
-    }
+    // private disposeWwwTree(): void {
+    //     this.wwwTree = undefined;
+    // }
 
     private async getLocalTree(
         dirPath: string,
@@ -343,7 +393,7 @@ export class FileProviderService {
         return localTree;
     }
 
-    private disposeLocalTree(dirPath: string): void {
-        this.localTreeMap.delete(dirPath);
-    }
+    // private disposeLocalTree(dirPath: string): void {
+    //     this.localTreeMap.delete(dirPath);
+    // }
 }
