@@ -5,7 +5,7 @@ import { CliModule } from './services/cli/cli.module';
 import { ConfigurationModule } from './services/configuration/configuration.module';
 import { FileProviderModule } from './services/file-provider/file-provider.module';
 import { IoModule } from './services/io/io.module';
-import { RefactorerModule } from './services/refactorer/refactorer.module';
+import { RefactorModule } from './services/refactor/refactor.module';
 
 @Module({
     imports: [
@@ -13,7 +13,7 @@ import { RefactorerModule } from './services/refactorer/refactorer.module';
         CliModule,
         ConfigurationModule,
         AnalyzerModule,
-        RefactorerModule,
+        RefactorModule,
         FileProviderModule,
     ],
     providers: [AppService],

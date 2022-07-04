@@ -9,7 +9,7 @@ import {
 import { FileProviderService } from './services/file-provider/file-provider.service';
 import { IoService } from './services/io/io.service';
 import { Quit } from './quit-exception';
-import { RefactorService } from './services/refactorer/refactorer.service';
+import { RefactorService } from './services/refactor/refactor.service';
 
 @Injectable()
 export class AppService {

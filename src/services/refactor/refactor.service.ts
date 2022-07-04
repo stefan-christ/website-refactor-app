@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CONFIGURATION, Configuration } from '../configuration/configuration';
 
+import { Quit } from '../../quit-exception';
 import { CliService, Option, OPTION_QUIT } from '../cli/cli.service';
 import { Directory } from '../file-provider/file-model';
 import { FileProviderService } from '../file-provider/file-provider.service';
 import { IoService } from '../io/io.service';
-import { Quit } from '../../quit-exception';
 import { Replacer } from './replacer';
 
 enum RefactorCommand {
