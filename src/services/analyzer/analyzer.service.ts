@@ -5,7 +5,7 @@ import { CONFIGURATION, Configuration } from '../configuration/configuration';
 import { Directory, File, Link } from '../file-provider/file-model';
 import { FileProviderService } from '../file-provider/file-provider.service';
 import { IoService } from '../io/io.service';
-import { Quit } from '../quit-exception';
+import { Quit } from '../../quit-exception';
 
 @Injectable()
 export class AnalyzerService {

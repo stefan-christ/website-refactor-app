@@ -2,7 +2,7 @@ import { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { AppService } from './app.service';
-import { Quit } from './services/quit-exception';
+import { Quit } from './quit-exception';
 
 console.log('application start');
 

@@ -3,7 +3,7 @@ import { CliService, Option, OPTION_QUIT } from '../cli/cli.service';
 import { CONFIGURATION, Configuration } from '../configuration/configuration';
 import { FtpService } from '../ftp/ftp.service';
 import { IoService } from '../io/io.service';
-import { Quit } from '../quit-exception';
+import { Quit } from '../../quit-exception';
 import { Directory, File, Tree } from './file-model';
 
 @Injectable()

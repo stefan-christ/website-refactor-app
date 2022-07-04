@@ -8,7 +8,7 @@ import {
 } from './services/configuration/configuration';
 import { FileProviderService } from './services/file-provider/file-provider.service';
 import { IoService } from './services/io/io.service';
-import { Quit } from './services/quit-exception';
+import { Quit } from './quit-exception';
 import { RefactorService } from './services/refactorer/refactorer.service';
 
 @Injectable()
