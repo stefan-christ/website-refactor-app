@@ -2,7 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import { AnalyzerService } from './services/analyzer/analyzer.service';
 import { CliService, Option, OPTION_QUIT } from './services/cli/cli.service';
-import { CONFIG, Configuration } from './services/configuration/configuration';
+import {
+    CONFIGURATION,
+    Configuration,
+} from './services/configuration/configuration';
 import { FileProviderService } from './services/file-provider/file-provider.service';
 import { IoService } from './services/io/io.service';
 import { Quit } from './services/quit-exception';
@@ -11,7 +14,7 @@ import { RefactorService } from './services/refactorer/refactorer.service';
 @Injectable()
 export class AppService {
     constructor(
-        @Inject(CONFIG) private readonly config: Configuration,
+        @Inject(CONFIGURATION) private readonly configuration: Configuration,
         private readonly analyzerService: AnalyzerService,
         private readonly refactorService: RefactorService,
         private readonly fileProvider: FileProviderService,
@@ -32,13 +35,13 @@ export class AppService {
     }
 
     private async validateConfig(): Promise<boolean> {
-        if (!this.io.pathExists(this.config.wwwDir)) {
+        if (!this.io.pathExists(this.configuration.wwwDir)) {
             this.cli.prompt(
                 'The www dir path of your configuration could not be resolved.',
             );
             return false;
         }
-        if (!this.io.pathExists(this.config.workingDir)) {
+        if (!this.io.pathExists(this.configuration.workingDir)) {
             this.cli.prompt(
                 'The working dir path of your configuration could not be resolved.',
             );

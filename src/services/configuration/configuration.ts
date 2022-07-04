@@ -1,7 +1,7 @@
 import { InjectionToken } from '@nestjs/common';
 import { FtpConfig } from '../ftp/ftp-config';
 
-export const CONFIG: InjectionToken = Symbol('CONFIG');
+export const CONFIGURATION: InjectionToken = Symbol('CONFIGURATION');
 
 export interface Configuration {
     wwwDir?: string;

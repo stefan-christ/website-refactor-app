@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 
 import { CliService, Option, OPTION_QUIT } from '../cli/cli.service';
-import { CONFIG, Configuration } from '../configuration/configuration';
+import { CONFIGURATION, Configuration } from '../configuration/configuration';
 import { Directory, File, Link } from '../file-provider/file-model';
 import { FileProviderService } from '../file-provider/file-provider.service';
 import { IoService } from '../io/io.service';
@@ -10,7 +10,7 @@ import { Quit } from '../quit-exception';
 @Injectable()
 export class AnalyzerService {
     constructor(
-        @Inject(CONFIG) private readonly config: Configuration,
+        @Inject(CONFIGURATION) private readonly configuration: Configuration,
         private readonly fileProvider: FileProviderService,
         private readonly io: IoService,
         private readonly cli: CliService,
@@ -75,7 +75,7 @@ export class AnalyzerService {
 
         do {
             let ts = '';
-            if (this.config.timestamp === 'file') {
+            if (this.configuration.timestamp === 'file') {
                 ts = this.io.getTimestamp() + ' ';
             }
 
@@ -119,7 +119,7 @@ export class AnalyzerService {
                         await this.findProblematicCharacters(ts);
                         break;
                     case optionDetectFileEncodings.answer:
-                        // await this.findProblematicCharacters();
+                        await this.detectFileEncodings(ts);
                         break;
 
                     case optionFileMenu.answer:
@@ -275,6 +275,10 @@ export class AnalyzerService {
         await this.io.writeTextFile(reportFilePath, report);
     }
 
+    private async detectFileEncodings(timestamp: string): Promise<void> {
+        //
+    }
+
     private async findProblematicCharacters(timestamp: string): Promise<void> {
         const tree = await this.fileProvider.getCurrentTree();
         let reportDirs = '';
@@ -285,7 +289,11 @@ export class AnalyzerService {
             const nameLC = name.toLowerCase();
             for (let index = 0; index < nameLC.length; index++) {
                 const charLC = nameLC.substring(index, index + 1);
-                if (!this.config.tweaking.filenameCharacters.includes(charLC)) {
+                if (
+                    !this.configuration.tweaking.filenameCharacters.includes(
+                        charLC,
+                    )
+                ) {
                     const char = name.substring(index, index + 1);
                     if (!problematic.includes(char)) {
                         problematic.push(char);
@@ -314,7 +322,6 @@ export class AnalyzerService {
                 for (const dir of dirs) {
                     const problematic = getProblematicCharacters(dir.name);
                     if (problematic) {
-                        // console.log('problematic');
                         reportDirs += parentPath + dir.name + '\n';
                         reportDirs +=
                             "   '" + problematic.join("'\n   ") + "'\n";

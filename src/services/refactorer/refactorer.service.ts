@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CONFIG, Configuration } from '../configuration/configuration';
+import { CONFIGURATION, Configuration } from '../configuration/configuration';
 
 import { CliService, Option, OPTION_QUIT } from '../cli/cli.service';
 import { Directory } from '../file-provider/file-model';
@@ -24,15 +24,15 @@ export class RefactorService {
     private currentMediaFolder?: string;
 
     constructor(
-        @Inject(CONFIG) private readonly config: Configuration,
+        @Inject(CONFIGURATION) private readonly configuration: Configuration,
         private readonly fileProvider: FileProviderService,
         private readonly io: IoService,
         private readonly cli: CliService,
     ) {
         this.replacer = new Replacer(
-            config.tweaking.filenameCharacters,
-            config.tweaking.validLeadSequences,
-            config.tweaking.validTrailSequences,
+            configuration.tweaking.filenameCharacters,
+            configuration.tweaking.validLeadSequences,
+            configuration.tweaking.validTrailSequences,
         );
     }
 
@@ -68,10 +68,11 @@ export class RefactorService {
         command: RefactorCommand,
     ): Promise<void> {
         const excludedExtensions: string[] =
-            !this.config.refactor.replacementExclusionFileTypes ||
-            this.config.refactor.replacementExclusionFileTypes.length === 0
+            !this.configuration.refactor.replacementExclusionFileTypes ||
+            this.configuration.refactor.replacementExclusionFileTypes.length ===
+                0
                 ? undefined
-                : this.config.refactor.replacementExclusionFileTypes;
+                : this.configuration.refactor.replacementExclusionFileTypes;
 
         const tree = await this.fileProvider.getWwwTree(true);
         let mediaFiles: string[];
@@ -90,7 +91,7 @@ export class RefactorService {
             await this.fileProvider.listFileNames(tree, {
                 recursive: true,
                 relative: true,
-                includedExtensions: this.config.refactor.sourceFileTypes,
+                includedExtensions: this.configuration.refactor.sourceFileTypes,
             })
         ).filter((fileName) => !fileName.startsWith(mediaFolder + this.io.sep));
 
@@ -111,7 +112,7 @@ export class RefactorService {
             for (let index = 0; index < mediaFile.length; index++) {
                 const character = mediaFile.substring(index, index + 1);
                 if (
-                    !this.config.tweaking.filenameCharacters.includes(
+                    !this.configuration.tweaking.filenameCharacters.includes(
                         character.toLowerCase(),
                     )
                 ) {
@@ -161,7 +162,7 @@ export class RefactorService {
         await this.io.ensureDirectory(reportDirPath);
 
         let ts = '';
-        if (this.config.timestamp === 'file') {
+        if (this.configuration.timestamp === 'file') {
             ts = this.io.getTimestamp() + ' ';
         }
 
@@ -187,7 +188,7 @@ export class RefactorService {
         this.reportErrors += params.join(' ') + '\n';
     }
     private writeOperation(detail: boolean, ...params: string[]): void {
-        if (!detail || this.config.verboseLogging) {
+        if (!detail || this.configuration.verboseLogging) {
             console.log(...params);
         }
         this.reportOperations += params.join(' ') + '\n';
@@ -218,7 +219,10 @@ export class RefactorService {
                 sourceFile,
             );
 
-            const sourceFilePath = this.io.join(this.config.wwwDir, sourceFile);
+            const sourceFilePath = this.io.join(
+                this.configuration.wwwDir,
+                sourceFile,
+            );
             const source = await this.io.readTextFile(sourceFilePath);
             if (!source) {
                 continue;
@@ -265,16 +269,16 @@ export class RefactorService {
     }
 
     async validateConfig(): Promise<boolean> {
-        if (!this.config.refactor) {
+        if (!this.configuration.refactor) {
             await this.cli.prompt(
                 'Refactoring not yet set up in configuration.json',
             );
             return false;
         }
         if (
-            !this.config.refactor.sourceFileTypes ||
-            !Array.isArray(this.config.refactor.sourceFileTypes) ||
-            this.config.refactor.sourceFileTypes.length === 0
+            !this.configuration.refactor.sourceFileTypes ||
+            !Array.isArray(this.configuration.refactor.sourceFileTypes) ||
+            this.configuration.refactor.sourceFileTypes.length === 0
         ) {
             await this.cli.prompt(
                 'Refactoring not set up properly in configuration.json.\nYou have to specify at least one source file type.',
@@ -396,7 +400,7 @@ export class RefactorService {
             } else {
                 try {
                     const mediaDirPath = this.io.join(
-                        this.config.wwwDir,
+                        this.configuration.wwwDir,
                         mediaDirName,
                     );
                     if (!this.io.pathExists(mediaDirPath)) {
