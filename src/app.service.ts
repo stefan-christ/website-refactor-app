@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 
 import { AnalyzerService } from './services/analyzer/analyzer.service';
-import { CliService } from './services/cli/cli.service';
+import { CliService, Option, OPTION_QUIT } from './services/cli/cli.service';
 import { CONFIG, Configuration } from './services/configuration/configuration';
-import { FtpAnalyzerService } from './services/ftp-analyzer/ftp-analyzer.service';
+import { FileProviderService } from './services/file-provider/file-provider.service';
 import { IoService } from './services/io/io.service';
 import { Quit } from './services/quit-exception';
 import { RefactorService } from './services/refactorer/refactorer.service';
@@ -14,7 +14,7 @@ export class AppService {
         @Inject(CONFIG) private readonly config: Configuration,
         private readonly analyzerService: AnalyzerService,
         private readonly refactorService: RefactorService,
-        private readonly ftpAnalyzerService: FtpAnalyzerService,
+        private readonly fileProvider: FileProviderService,
         private readonly io: IoService,
         private readonly cli: CliService,
     ) {}
@@ -24,6 +24,10 @@ export class AppService {
             return;
         }
 
+        await this.fileProvider.showFileMenu({});
+        if (!(await this.fileProvider.getCurrentTree())) {
+            throw Quit;
+        }
         return this.showMainMenu();
     }
 
@@ -44,44 +48,40 @@ export class AppService {
     }
 
     private async showMainMenu(): Promise<void> {
-        const optionRefactorSourceFiles = 'refactor source files';
-        const optionAnalyzeFileTypesWww = 'analyze file types (www dir)';
-        const optionAnalyzeFileTypesCustom = 'analyze file types (custom dir)';
-        const optionAnalyzeFtpFiles = 'analyze FTP files';
-        const optionDetectFileEncodings = 'detect file enccodings';
-        const optionQuit = 'quit';
+        const menuName = 'MAIN MENU';
+        const optionRefactorSourceFiles: Option = {
+            answer: 'refactor source files',
+            choice: '1',
+        };
+        const optionAnalyzeFileTypes: Option = {
+            answer: 'analyze file types',
+            choice: '2',
+        };
+        const optionFileMenu = this.fileProvider.optionFileMenu;
 
         do {
-            const option = await this.cli.choose(
-                'Which action do you want to perform?',
-                [
-                    optionRefactorSourceFiles,
-                    optionAnalyzeFileTypesWww,
-                    optionAnalyzeFileTypesCustom,
-                    optionAnalyzeFtpFiles,
-                    optionDetectFileEncodings,
-                    optionQuit,
-                ],
-            );
+            const option = await this.cli.choose(menuName, undefined, [
+                optionRefactorSourceFiles,
+                optionAnalyzeFileTypes,
+                undefined,
+                optionFileMenu,
+                OPTION_QUIT,
+            ]);
 
             switch (option) {
-                case optionRefactorSourceFiles:
+                case optionRefactorSourceFiles.answer:
                     if (!(await this.refactorService.validateConfig())) {
                         return;
                     }
-                    await this.refactorService.showMainMenu();
+                    await this.refactorService.showMainMenu(menuName);
                     break;
-                case optionAnalyzeFileTypesWww:
-                    await this.analyzerService.showMainMenu('www');
+                case optionAnalyzeFileTypes.answer:
+                    await this.analyzerService.showMainMenu(menuName);
                     break;
-                case optionAnalyzeFileTypesCustom:
-                    await this.analyzerService.showMainMenu('custom');
-                    break;
-                case optionAnalyzeFtpFiles:
-                    await this.ftpAnalyzerService.showMainMenu();
-                    break;
-                case optionDetectFileEncodings:
-                    await this.ftpAnalyzerService.showMainMenu();
+                case optionFileMenu.answer:
+                    await this.fileProvider.showFileMenu({
+                        origin: 'FILE MENU',
+                    });
                     break;
                 default:
                     throw Quit;

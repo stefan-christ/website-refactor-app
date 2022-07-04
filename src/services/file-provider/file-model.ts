@@ -17,3 +17,7 @@ export interface Directory {
     files?: File[];
     links?: Link[];
 }
+
+export interface Tree extends Directory {
+    type: 'local' | 'remote';
+}

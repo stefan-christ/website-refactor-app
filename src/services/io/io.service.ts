@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as fs from 'fs';
 import { jsonc } from 'jsonc';
 import * as path from 'path';
-import { Directory, File, Link } from '../file-provider/file-model';
+import { Directory, File, Link, Tree } from '../file-provider/file-model';
 
 @Injectable()
 export class IoService {
@@ -120,7 +120,7 @@ export class IoService {
         return jsonc.parse(text);
     }
 
-    async getTree(dirPath: string): Promise<Directory> {
+    async getTree(dirPath: string): Promise<Tree> {
         const recursion = async (
             parentDirectory: Directory,
             dirPath: string,
@@ -208,11 +208,12 @@ export class IoService {
         };
 
         const normalized = path.normalize(dirPath) + this.sep;
-        const tree: Directory = {
+        const tree: Tree = {
             name: this.getNameFromPath(normalized),
             parentPath: this.join(path.dirname(normalized), this.sep),
+            type: 'local',
         };
-        console.log('tree', tree);
+        // console.log('tree', tree);
         await recursion(tree, normalized);
         return tree;
     }

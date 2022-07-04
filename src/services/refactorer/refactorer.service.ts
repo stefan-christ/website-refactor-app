@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CONFIG, Configuration } from '../configuration/configuration';
 
-import { CliService } from '../cli/cli.service';
+import { CliService, Option, OPTION_QUIT } from '../cli/cli.service';
 import { Directory } from '../file-provider/file-model';
 import { FileProviderService } from '../file-provider/file-provider.service';
 import { IoService } from '../io/io.service';
@@ -21,6 +21,8 @@ export class RefactorService {
 
     private replacer: Replacer;
 
+    private currentMediaFolder?: string;
+
     constructor(
         @Inject(CONFIG) private readonly config: Configuration,
         private readonly fileProvider: FileProviderService,
@@ -36,32 +38,33 @@ export class RefactorService {
 
     private async getMediaFileNames(
         tree: Directory,
-        mediaDirName: string,
+        mediaFolder: string,
         excludedExtensions: string[],
     ): Promise<string[]> {
-        const mediaDir = tree.directories?.find(
-            (dir) => dir.name === mediaDirName,
+        const mediaDirectory = tree.directories?.find(
+            (dir) => dir.name === mediaFolder,
         );
-        if (!mediaDir) {
-            throw new Error('media dir does not exist');
+        if (!mediaDirectory) {
+            throw new Error('media folder does not exist');
         }
 
-        const mediaFiles = await this.fileProvider.listFileNames(mediaDir, {
-            recursive: true,
-            relative: true,
-            excludedExtensions,
-        });
+        const mediaFiles = await this.fileProvider.listFileNames(
+            mediaDirectory,
+            {
+                recursive: true,
+                relative: true,
+                excludedExtensions,
+            },
+        );
 
         if (mediaFiles.length === 0) {
-            throw new Error(
-                'no matching media files found in media directory.',
-            );
+            throw new Error('no matching files found in media folder.');
         }
         return mediaFiles;
     }
 
     private async refactorSourceFiles(
-        mediaDirName: string,
+        mediaFolder: string,
         command: RefactorCommand,
     ): Promise<void> {
         const excludedExtensions: string[] =
@@ -70,15 +73,12 @@ export class RefactorService {
                 ? undefined
                 : this.config.refactor.replacementExclusionFileTypes;
 
-        const tree = await this.fileProvider.getLocalTree(
-            this.config.wwwDir,
-            true,
-        );
+        const tree = await this.fileProvider.getWwwTree(true);
         let mediaFiles: string[];
         try {
             mediaFiles = await this.getMediaFileNames(
                 tree,
-                mediaDirName,
+                mediaFolder,
                 excludedExtensions,
             );
         } catch (error) {
@@ -92,9 +92,7 @@ export class RefactorService {
                 relative: true,
                 includedExtensions: this.config.refactor.sourceFileTypes,
             })
-        ).filter(
-            (fileName) => !fileName.startsWith(mediaDirName + this.io.sep),
-        );
+        ).filter((fileName) => !fileName.startsWith(mediaFolder + this.io.sep));
 
         if (sourceFiles.length === 0) {
             await this.cli.prompt(
@@ -138,7 +136,7 @@ export class RefactorService {
 
         await this.replaceMediaReferences(
             command,
-            mediaDirName,
+            mediaFolder,
             mediaFiles,
             sourceFiles,
         );
@@ -159,7 +157,10 @@ export class RefactorService {
                 break;
         }
 
-        const reportDirPath = this.io.join(this.config.workingDir, reportDir);
+        const reportDirPath = this.io.join(
+            await this.fileProvider.getReportDirPath(),
+            reportDir,
+        );
         await this.io.ensureDirectory(reportDirPath);
 
         const ts = this.io.getTimestamp();
@@ -283,65 +284,99 @@ export class RefactorService {
         return true;
     }
 
-    async showMainMenu(): Promise<void> {
-        let mediaDirName: string;
+    async showMainMenu(origin: string): Promise<void> {
+        let mediaFolder = this.currentMediaFolder;
         do {
-            if (!mediaDirName) {
-                mediaDirName = await this.requestMediaDirName();
+            if (!mediaFolder) {
+                mediaFolder = await this.requestMediaDirName();
             }
-            if (!mediaDirName) {
+            if (!mediaFolder) {
                 return;
             }
-            if (!!mediaDirName) {
-                let command: RefactorCommand | 'choose dir' =
-                    await this.requestCommand(mediaDirName);
+            this.currentMediaFolder = mediaFolder;
+            if (!!this.currentMediaFolder) {
+                let command: RefactorCommand | 'choose folder' =
+                    await this.requestCommand(this.currentMediaFolder, origin);
                 if (command === undefined) {
                     return;
                 }
-                if (command === 'choose dir') {
-                    mediaDirName = undefined;
+                if (command === 'choose folder') {
+                    mediaFolder = undefined;
                 } else {
-                    await this.refactorSourceFiles(mediaDirName, command);
+                    await this.refactorSourceFiles(
+                        this.currentMediaFolder,
+                        command,
+                    );
                 }
             }
         } while (true);
     }
 
     private async requestCommand(
-        mediaDirName: string,
-    ): Promise<RefactorCommand | 'choose dir' | undefined> {
-        const optionCheckConditions = 'check conditions';
-        const optionDryRun = 'dry run (no changes will be made)';
-        const optionWetRun = 'wet run (file contents are edited) CAUTION!';
-        const optionChooseDir = 'choose a different dir name';
-        const optionBack = 'back';
-        const optionQuit = 'quit';
+        mediaFolder: string,
+        origin: string,
+    ): Promise<RefactorCommand | 'choose folder' | undefined> {
+        const menuName = 'REFACTORER MENU';
+
+        const optionCheckConditions: Option = {
+            answer: 'Check conditions',
+            choice: '1',
+        };
+        const optionDryRun: Option = {
+            answer: 'Dry Run (no changes will be made)',
+            choice: '2',
+        };
+        const optionWetRun: Option = {
+            answer: 'Wet Run (file contents are edited) CAUTION!',
+            choice: '3',
+        };
+        const optionChooseMediaFolder: Option = {
+            answer:
+                'Choose a different media folder (current: ' +
+                mediaFolder +
+                ')',
+            choice: 'M',
+        };
+        const optionGoBack = this.cli.getOptionGoBack(origin);
 
         do {
+            const optionFileMenu = this.fileProvider.optionFileMenu;
+
             const option = await this.cli.choose(
-                'Choose an action to perform on dir ' + mediaDirName + '?',
+                menuName,
+                // `Choose an action to perform on media folder '${mediaFolder}'?`,
+                undefined,
                 [
                     optionCheckConditions,
                     optionDryRun,
                     optionWetRun,
-                    optionChooseDir,
-                    optionBack,
-                    optionQuit,
+                    undefined,
+                    optionChooseMediaFolder,
+                    undefined,
+                    optionFileMenu,
+                    optionGoBack,
+                    OPTION_QUIT,
                 ],
             );
 
             switch (option) {
-                case optionCheckConditions:
+                case optionCheckConditions.answer:
                     return RefactorCommand.CheckConditions;
-                case optionDryRun:
+                case optionDryRun.answer:
                     return RefactorCommand.DryRun;
-                case optionWetRun:
+                case optionWetRun.answer:
                     return RefactorCommand.WetRun;
-                case optionChooseDir:
-                    return 'choose dir';
-                case optionBack:
+                case optionChooseMediaFolder.answer:
+                    return 'choose folder';
+
+                case optionFileMenu.answer:
+                    await this.fileProvider.showFileMenu({
+                        origin: menuName,
+                    });
+                    break;
+                case optionGoBack.answer:
                     return undefined;
-                case optionQuit:
+                case OPTION_QUIT.answer:
                     throw Quit;
                 default:
                     return undefined;
@@ -354,7 +389,7 @@ export class RefactorService {
 
         do {
             mediaDirName = await this.cli.request(
-                'Enter a media dir name inside the www dir.',
+                'Enter name of a media folder located in the current root directory',
             );
             if (!mediaDirName) {
                 return undefined;

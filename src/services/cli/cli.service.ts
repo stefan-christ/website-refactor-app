@@ -1,31 +1,36 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import prompt, { Schema } from 'prompt';
 
-import { CliSettings, CLI_SETTINGS } from './cli-settings';
+export interface Option {
+    answer: string;
+    choice: string;
+}
+
+export const OPTION_QUIT: Option = { answer: 'Quit', choice: 'Q' };
 
 @Injectable()
 export class CliService {
-    constructor(
-        @Inject(CLI_SETTINGS) private readonly cliSettings: CliSettings,
-    ) {
-        prompt.start({ message: 'Question' });
+    constructor() {
+        prompt.start();
+    }
+
+    getOptionGoBack(origin: string): Option {
+        return { answer: 'Go back to ' + origin, choice: 'B' };
     }
 
     private get lineSep(): string {
-        return this.cliSettings.lineSep;
+        return '\n';
     }
 
-    async prompt(message: string): Promise<void> {
+    async prompt(message: unknown): Promise<void> {
         console.log('');
         console.log(message);
     }
 
     async request(question: string): Promise<string> {
+        prompt.message = question;
         let description =
-            question +
-            this.lineSep +
-            'Enter nothing to abort operation.' +
-            this.lineSep;
+            this.lineSep + 'Enter nothing to abort operation.' + this.lineSep;
         const schema: Schema = {
             properties: {
                 question: {
@@ -50,11 +55,10 @@ export class CliService {
     }
 
     async secret(question: string): Promise<string> {
+        prompt.message = question;
+
         let description =
-            question +
-            this.lineSep +
-            'Enter nothing to abort operation.' +
-            this.lineSep;
+            this.lineSep + 'Enter nothing to abort operation.' + this.lineSep;
         const schema = {
             properties: {
                 question: {
@@ -80,19 +84,33 @@ export class CliService {
         });
     }
 
-    async choose(question: string, options?: string[]): Promise<string> {
-        let description = question;
+    async choose(
+        menu: string,
+        question: string,
+        options?: Option[],
+    ): Promise<string> {
+        prompt.message = menu;
+
+        let description = !!question ? this.lineSep + question : '';
+
         if (!!options) {
             description += this.lineSep;
             description +=
-                'Choose on option by typing its number.' +
+                'Choose on option by typing its number or letter.' +
                 this.lineSep +
                 'Enter nothing to abort operation.' +
                 this.lineSep;
+            description += this.lineSep;
             for (let index = 0; index < options.length; index++) {
-                const answer = options[index];
-                description += '(' + (index + 1) + ') ' + answer + this.lineSep;
+                if (!options[index]) {
+                    description += this.lineSep;
+                } else {
+                    const answer = options[index].answer;
+                    const choice = options[index].choice;
+                    description += '(' + choice + ') ' + answer + this.lineSep;
+                }
             }
+            description += this.lineSep;
         }
         const schema: Schema = {
             properties: {
@@ -114,14 +132,15 @@ export class CliService {
                         if (!options) {
                             resolve(result.question as string);
                         } else {
-                            const answerIndex = +result.question;
-                            if (
-                                answerIndex < 0 ||
-                                answerIndex > options.length
-                            ) {
+                            const index = options.findIndex(
+                                (option) =>
+                                    option?.choice.toLowerCase() ===
+                                    result.question.toString().toLowerCase(),
+                            );
+                            if (index === -1) {
                                 resolve(undefined);
                             } else {
-                                resolve(options[answerIndex - 1]);
+                                resolve(options[index].answer);
                             }
                         }
                     }

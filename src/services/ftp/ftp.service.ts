@@ -2,7 +2,7 @@ import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import * as path from 'path';
 import sftp from 'ssh2-sftp-client';
 import { CONFIG, Configuration } from '../configuration/configuration';
-import { Directory, File, Link } from '../file-provider/file-model';
+import { Directory, File, Link, Tree } from '../file-provider/file-model';
 
 type Client = sftp;
 
@@ -48,7 +48,7 @@ export class FtpService implements OnModuleDestroy {
         return this._client;
     }
 
-    async getTree(): Promise<Directory> {
+    async getTree(): Promise<Tree> {
         const client: Client = await this.getClient();
 
         const scanDir = async (parentDir: Directory, dirPath: string) => {
@@ -92,9 +92,10 @@ export class FtpService implements OnModuleDestroy {
             }
         };
 
-        const tree: Directory = {
+        const tree: Tree = {
             name: '',
             parentPath: '',
+            type: 'remote',
         };
         await scanDir(tree, '/');
         return tree;
