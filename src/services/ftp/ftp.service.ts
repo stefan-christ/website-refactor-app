@@ -1,4 +1,4 @@
-import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import * as path from 'path';
 import sftp from 'ssh2-sftp-client';
 import { Directory, File, Link, Tree } from '../file-provider/file-model';
@@ -7,16 +7,10 @@ import { FtpConfig, FTP_CONFIG } from './ftp-config';
 type Client = sftp;
 
 @Injectable()
-export class FtpService implements OnModuleDestroy {
-    private _client: Client;
-
+export class FtpService {
     constructor(
         @Inject(FTP_CONFIG) private readonly configuration: FtpConfig,
     ) {}
-
-    async onModuleDestroy(): Promise<void> {
-        return this.closeClient();
-    }
 
     private getFileExtension(fileName: string): string {
         let extension = path.extname(fileName);
@@ -28,30 +22,29 @@ export class FtpService implements OnModuleDestroy {
         return extension;
     }
 
-    private async closeClient(): Promise<void> {
-        if (this._client) {
-            await this._client.end();
-            this._client = undefined;
+    private async closeClient(client: Client): Promise<void> {
+        if (client) {
+            await client.end();
         }
     }
 
     private async getClient(): Promise<Client> {
-        if (!this._client) {
-            this._client = new sftp();
-            await this._client.connect({
-                host: this.configuration.host,
-                port: this.configuration.port,
-                username: this.configuration.username,
-                password: this.configuration.password,
-            });
-        }
-        return this._client;
+        const client = new sftp();
+        await client.connect({
+            host: this.configuration.host,
+            port: this.configuration.port,
+            username: this.configuration.username,
+            password: this.configuration.password,
+        });
+        return client;
     }
 
     async getTree(): Promise<Tree> {
-        const client: Client = await this.getClient();
-
-        const scanDir = async (parentDir: Directory, dirPath: string) => {
+        const scanDir = async (
+            client: Client,
+            parentDir: Directory,
+            dirPath: string,
+        ) => {
             const fileInfos = await client.list(dirPath);
 
             const parentPath = parentDir.parentPath + parentDir.name + '/';
@@ -85,6 +78,7 @@ export class FtpService implements OnModuleDestroy {
             if (parentDir.directories?.length > 0) {
                 for (const subDir of parentDir.directories) {
                     await scanDir(
+                        client,
                         subDir,
                         subDir.parentPath + '/' + subDir.name,
                     );
@@ -98,7 +92,19 @@ export class FtpService implements OnModuleDestroy {
             type: 'remote',
             pathSeparator: '/',
         };
-        await scanDir(tree, '/');
+        let client: Client;
+        try {
+            client = await this.getClient();
+            await scanDir(client, tree, '/');
+        } finally {
+            try {
+                await this.closeClient(client);
+            } catch (error) {
+                // silence
+            }
+            client = undefined;
+        }
+
         return tree;
     }
 }
