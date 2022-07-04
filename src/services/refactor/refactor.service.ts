@@ -5,7 +5,7 @@ import { Quit } from '../../quit-exception';
 import { CliService, Option, OPTION_QUIT } from '../cli/cli.service';
 import { Directory, File, Tree } from '../file-provider/file-model';
 import { FileProviderService } from '../file-provider/file-provider.service';
-import { IoService } from '../io/io.service';
+import { ReportService } from '../report/report.service';
 import { Replacer } from './replacer';
 
 enum RefactorCommand {
@@ -28,7 +28,7 @@ export class RefactorService {
     constructor(
         @Inject(APP_CONFIG) private readonly configuration: AppConfig,
         private readonly fileProvider: FileProviderService,
-        private readonly io: IoService,
+        private readonly report: ReportService,
         private readonly cli: CliService,
     ) {
         this.replacer = new Replacer(
@@ -92,7 +92,6 @@ export class RefactorService {
         const sourceFiles = (
             await this.fileProvider.listFiles(tree, {
                 recursive: true,
-                // relative: true,
                 includedExtensions: this.configuration.refactor.sourceFileTypes,
             })
         ).filter((sourceFile) => {
@@ -100,7 +99,7 @@ export class RefactorService {
                 sourceFile.parentPath + sourceFile.name,
                 tree,
             );
-            return !filePath.startsWith(mediaFolder + this.io.sep);
+            return !filePath.startsWith(mediaFolder + tree.pathSeparator);
         });
 
         if (sourceFiles.length === 0) {
@@ -167,28 +166,25 @@ export class RefactorService {
                 throw new Error('unknown command ' + command);
         }
 
-        const reportDirPath = await this.fileProvider.getReportDirPath();
-        await this.io.ensureDirectory(reportDirPath);
-
         let ts = '';
         if (this.configuration.timestamp === 'file') {
-            ts = this.io.getTimestamp() + ' ';
+            ts = this.report.getTimestamp() + ' ';
         }
 
         if (!this.reportOperations) {
             this.reportOperations = 'no operations';
         }
-        await this.io.writeTextFile(
-            this.io.join(reportDirPath, `${ts}${reportName} operations.log`),
+        await this.report.writeTextReport(
             this.reportOperations,
+            `${ts}${reportName} operations.log`,
         );
 
         if (!this.reportErrors) {
             this.reportErrors = 'no errors';
         }
-        await this.io.writeTextFile(
-            this.io.join(reportDirPath, `${ts}${reportName} errors.log`),
+        await this.report.writeTextReport(
             this.reportErrors,
+            `${ts}${reportName} errors.log`,
         );
     }
 
@@ -234,11 +230,7 @@ export class RefactorService {
                 relativeFilePath,
             );
 
-            const sourceFilePath = this.io.join(
-                sourceFile.parentPath,
-                sourceFile.name,
-            );
-            const source = await this.io.readTextFile(sourceFilePath);
+            const source = await this.report.loadSourceFile(sourceFile);
             if (!source) {
                 continue;
             }
@@ -275,8 +267,8 @@ export class RefactorService {
                 command === RefactorCommand.WetRun
             ) {
                 // save the file
-                await this.io.writeTextFile(
-                    sourceFilePath,
+                await this.report.saveSourceFile(
+                    sourceFile,
                     this.replacer.getData(),
                 );
             }
@@ -403,7 +395,12 @@ export class RefactorService {
                         disallowFtp: true,
                     });
                     const tree = await this.fileProvider.getCurrentTree();
-                    if (!this.doesMediaFolderExist(tree, mediaFolder)) {
+                    if (
+                        !this.fileProvider.doesMediaFolderExist(
+                            tree,
+                            mediaFolder,
+                        )
+                    ) {
                         this.cli.prompt(
                             `Media folder '${mediaFolder}' does not exist in this file source.`,
                         );
@@ -431,7 +428,12 @@ export class RefactorService {
                 return undefined;
             } else {
                 try {
-                    if (!this.doesMediaFolderExist(tree, mediaFolder)) {
+                    if (
+                        !this.fileProvider.doesMediaFolderExist(
+                            tree,
+                            mediaFolder,
+                        )
+                    ) {
                         throw new Error(
                             `Media folder '${mediaFolder}' does not exist.`,
                         );
@@ -444,14 +446,5 @@ export class RefactorService {
         } while (!mediaFolder);
 
         return mediaFolder;
-    }
-
-    private doesMediaFolderExist(tree: Tree, mediaFolder: string): boolean {
-        const dir = tree.directories?.find((dir) => dir.name === mediaFolder);
-        if (!dir) {
-            return false;
-        }
-        const mediaFolderPath = this.io.join(dir.parentPath, dir.name);
-        return this.io.pathExists(mediaFolderPath);
     }
 }

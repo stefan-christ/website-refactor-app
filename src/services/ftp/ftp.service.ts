@@ -96,6 +96,7 @@ export class FtpService implements OnModuleDestroy {
             name: '',
             parentPath: '',
             type: 'remote',
+            pathSeparator: '/',
         };
         await scanDir(tree, '/');
         return tree;

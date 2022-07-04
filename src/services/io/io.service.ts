@@ -6,19 +6,9 @@ import { Directory, File, Link, Tree } from '../file-provider/file-model';
 
 @Injectable()
 export class IoService {
-    get sep(): string {
-        return path.sep;
-    }
-
-    getTimestamp(): string {
-        let ts = new Date()
-            .toISOString()
-            .replace('T', ' ')
-            .replace(':', '.')
-            .replace(':', '.')
-            .substring(0, 19);
-        return ts;
-    }
+    // get sep(): string {
+    //     return path.sep;
+    // }
 
     getFileExtension(fileName: string): string {
         let extension = path.extname(fileName);
@@ -139,7 +129,7 @@ export class IoService {
                             const parentPath = this.join(
                                 parentDirectory.parentPath,
                                 parentDirectory.name,
-                                this.sep,
+                                path.sep,
                             );
 
                             const files = dirents.filter(
@@ -207,13 +197,15 @@ export class IoService {
             });
         };
 
-        const normalized = path.normalize(dirPath) + this.sep;
+        const sep = path.sep;
+
+        const normalized = path.normalize(dirPath) + sep;
         const tree: Tree = {
             name: this.getNameFromPath(normalized),
-            parentPath: this.join(path.dirname(normalized), this.sep),
+            parentPath: this.join(path.dirname(normalized), sep),
             type: 'local',
+            pathSeparator: sep,
         };
-        // console.log('tree', tree);
         await recursion(tree, normalized);
         return tree;
     }

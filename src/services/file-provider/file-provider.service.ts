@@ -44,35 +44,17 @@ export class FileProviderService {
         };
     }
 
-    async getReportDirPath(): Promise<string | undefined> {
-        if (!!this.currentType) {
-            let dirName: string;
-            switch (this.currentType) {
-                case 'ftp':
-                    dirName = 'ftp';
-                    break;
-                case 'www':
-                    dirName = 'www';
-                    break;
-                default:
-                    dirName =
-                        'custom (' +
-                        this.io.getNameFromPath(this.currentType) +
-                        ')';
-                    break;
-            }
-            let path = this.io.join(this.configuration.workingDir, dirName);
-            if (this.configuration.timestamp === 'folder') {
-                path = this.io.join(path, this.io.getTimestamp());
-            }
-            await this.io.ensureDirectory(path);
-            return path;
-        }
-        return undefined;
-    }
-
     getCurrentType(): string | undefined {
         return this.currentType;
+    }
+
+    doesMediaFolderExist(tree: Tree, mediaFolder: string): boolean {
+        const dir = tree.directories?.find((dir) => dir.name === mediaFolder);
+        if (!dir) {
+            return false;
+        }
+        const mediaFolderPath = this.io.join(dir.parentPath, dir.name);
+        return this.io.pathExists(mediaFolderPath);
     }
 
     async getSafeLocalTree(origin: string): Promise<Tree | undefined> {
@@ -367,19 +349,12 @@ export class FileProviderService {
         return this.remoteTree;
     }
 
-    // private disposeRemoteTree(): void {
-    //     this.remoteTree = undefined;
-    // }
     private async getWwwTree(forceRefresh?: boolean): Promise<Tree> {
         if (!this.wwwTree || forceRefresh) {
             this.wwwTree = await this.io.getTree(this.configuration.wwwDir);
         }
         return this.wwwTree;
     }
-
-    // private disposeWwwTree(): void {
-    //     this.wwwTree = undefined;
-    // }
 
     private async getLocalTree(
         dirPath: string,
@@ -392,8 +367,4 @@ export class FileProviderService {
         }
         return localTree;
     }
-
-    // private disposeLocalTree(dirPath: string): void {
-    //     this.localTreeMap.delete(dirPath);
-    // }
 }

@@ -5,7 +5,7 @@ import { Quit } from '../../quit-exception';
 import { CliService, Option, OPTION_QUIT } from '../cli/cli.service';
 import { Directory, File, Link } from '../file-provider/file-model';
 import { FileProviderService } from '../file-provider/file-provider.service';
-import { IoService } from '../io/io.service';
+import { ReportService } from '../report/report.service';
 
 const MENU_NAME = 'ANALYZER MENU';
 
@@ -14,7 +14,7 @@ export class AnalyzerService {
     constructor(
         @Inject(APP_CONFIG) private readonly configuration: AppConfig,
         private readonly fileProvider: FileProviderService,
-        private readonly io: IoService,
+        private readonly report: ReportService,
         private readonly cli: CliService,
     ) {}
 
@@ -76,7 +76,7 @@ export class AnalyzerService {
         do {
             let ts = '';
             if (this.configuration.timestamp === 'file') {
-                ts = this.io.getTimestamp() + ' ';
+                ts = this.report.getTimestamp() + ' ';
             }
 
             const option = await this.cli.choose(MENU_NAME, undefined, options);
@@ -142,11 +142,10 @@ export class AnalyzerService {
 
     private async writeTreeFile(timestamp: string): Promise<void> {
         const tree = await this.fileProvider.getCurrentTree();
-        const reportFilePath = this.io.join(
-            await this.fileProvider.getReportDirPath(),
+        await this.report.writeJsonReport(
+            tree,
             timestamp + 'analyzer-file-tree.json',
         );
-        await this.io.writeJsonFile(reportFilePath, tree);
     }
 
     private async analyzeFileTypes(
@@ -158,25 +157,18 @@ export class AnalyzerService {
             recursive ? '' : '-non'
         }-recursive`;
 
-        const analysisFilePath = this.io.join(
-            await this.fileProvider.getReportDirPath(),
-            `${operation}.json`,
-        );
-
         const tree = await this.fileProvider.getCurrentTree();
-
         const types = this.fileProvider.getFileExtensionList(tree, recursive);
 
-        await this.io.writeJsonFile(analysisFilePath, types);
+        await this.report.writeJsonReport(types, `${operation}.json`);
         console.log('file types in root', types);
 
-        const analysisDirPath = this.io.join(
-            await this.fileProvider.getReportDirPath(),
-            operation,
-        );
+        // const analysisDirPath = this.io.join(
+        //     await this.report.getReportDirPath(),
+        //     operation,
+        // );
 
-        await this.io.rimraf(analysisDirPath);
-        await this.io.ensureDirectory(analysisDirPath);
+        await this.report.prepareDirectory(operation);
 
         for (let index = 0; index < types.length; index++) {
             const type = types[index];
@@ -188,11 +180,11 @@ export class AnalyzerService {
             });
 
             const fileName = type === '' ? 'no extension' : type.substring(1);
-            const jsonFile = this.io.join(
-                analysisDirPath,
+            await this.report.writeJsonReport(
+                fileList,
+                operation, // sub directory
                 `${fileIndex}-${fileName}.json`,
             );
-            await this.io.writeJsonFile(jsonFile, fileList);
         }
     }
 
@@ -270,11 +262,10 @@ export class AnalyzerService {
             '\n\n## FILES\n\n' +
             reportFiles;
 
-        const reportFilePath = this.io.join(
-            await this.fileProvider.getReportDirPath(),
+        await this.report.writeTextReport(
+            report,
             `${timestamp}analyzer-case-conflichts.md`,
         );
-        await this.io.writeTextFile(reportFilePath, report);
     }
 
     private async detectFileEncodings(timestamp: string): Promise<void> {
@@ -319,11 +310,10 @@ export class AnalyzerService {
 
         const reportSummary = '';
 
-        const reportPath = this.io.join(
-            await this.fileProvider.getReportDirPath(),
+        await this.report.writeTextReport(
+            reportSummary,
             `${timestamp}analyzer-file-encodings.md`,
         );
-        await this.io.writeTextFile(reportPath, reportSummary);
     }
 
     private async findProblematicCharacters(timestamp: string): Promise<void> {
@@ -398,11 +388,10 @@ export class AnalyzerService {
             '\n\n## FILES\n\n' +
             reportFiles;
 
-        const reportPath = this.io.join(
-            await this.fileProvider.getReportDirPath(),
+        await this.report.writeTextReport(
+            reportSummary,
             `${timestamp}analyzer-problematic-characters.md`,
         );
-        await this.io.writeTextFile(reportPath, reportSummary);
     }
 
     private async findSymbolicLinkConflicts(timestamp: string): Promise<void> {
@@ -436,10 +425,9 @@ export class AnalyzerService {
         }
         report = '# Symbolic Link Conflicts\n\n' + report;
 
-        const reportFilePath = this.io.join(
-            await this.fileProvider.getReportDirPath(),
+        await this.report.writeTextReport(
+            report,
             `${timestamp}analyzer-symbolic-links.md`,
         );
-        await this.io.writeTextFile(reportFilePath, report);
     }
 }

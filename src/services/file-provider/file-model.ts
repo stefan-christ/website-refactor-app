@@ -20,4 +20,5 @@ export interface Directory {
 
 export interface Tree extends Directory {
     type: 'local' | 'remote';
+    pathSeparator: string;
 }

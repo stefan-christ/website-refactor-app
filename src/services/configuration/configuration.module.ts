@@ -14,22 +14,44 @@ import { CONFIGURATION, Configuration } from './configuration';
             useFactory: async (io: IoService): Promise<Configuration> => {
                 const jsonPath = io.join('..', 'configuration.json');
                 const jsoncPath = io.join('..', 'configuration.jsonc');
+                let configuration: Configuration;
                 if (io.pathExists(jsoncPath)) {
-                    return io.readJsonFile<Configuration>(jsoncPath);
+                    configuration = await io.readJsonFile<Configuration>(
+                        jsoncPath,
+                    );
                 } else if (io.pathExists(jsonPath)) {
-                    return io.readJsonFile<Configuration>(jsonPath);
+                    configuration = await io.readJsonFile<Configuration>(
+                        jsonPath,
+                    );
                 }
-                throw new Error('no configuration file');
+                if (!configuration) {
+                    throw new Error('Configuration file not found');
+                }
+
+                if (!configuration.app) {
+                    throw new Error('App configuration not defined');
+                }
+                if (!io.pathExists(configuration.app.wwwDir)) {
+                    throw new Error(
+                        'WWW dir path of the app configuration could not be resolved',
+                    );
+                }
+                if (!io.pathExists(configuration.app.workingDir)) {
+                    throw new Error(
+                        'Working dir path of the app configuration could not be resolved',
+                    );
+                }
+
+                if (!configuration.ftp) {
+                    throw new Error('FTP configuration not defined');
+                }
+                return configuration;
             },
             inject: [IoService],
         },
-
         {
             provide: APP_CONFIG,
             useFactory: (configuration: Configuration): AppConfig => {
-                if (!configuration.app) {
-                    throw new Error('no app config');
-                }
                 return configuration.app;
             },
             inject: [CONFIGURATION],
@@ -38,9 +60,6 @@ import { CONFIGURATION, Configuration } from './configuration';
         {
             provide: FTP_CONFIG,
             useFactory: (configuration: Configuration): FtpConfig => {
-                if (!configuration.ftp) {
-                    throw new Error('no ftp config');
-                }
                 return configuration.ftp;
             },
             inject: [CONFIGURATION],
