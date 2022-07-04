@@ -1,8 +1,8 @@
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import * as path from 'path';
 import sftp from 'ssh2-sftp-client';
-import { CONFIGURATION, Configuration } from '../configuration/configuration';
 import { Directory, File, Link, Tree } from '../file-provider/file-model';
+import { FtpConfig, FTP_CONFIG } from './ftp-config';
 
 type Client = sftp;
 
@@ -11,7 +11,7 @@ export class FtpService implements OnModuleDestroy {
     private _client: Client;
 
     constructor(
-        @Inject(CONFIGURATION) private readonly configuration: Configuration,
+        @Inject(FTP_CONFIG) private readonly configuration: FtpConfig,
     ) {}
 
     async onModuleDestroy(): Promise<void> {
@@ -39,10 +39,10 @@ export class FtpService implements OnModuleDestroy {
         if (!this._client) {
             this._client = new sftp();
             await this._client.connect({
-                host: this.configuration.ftp.host,
-                port: this.configuration.ftp.port,
-                username: this.configuration.ftp.username,
-                password: this.configuration.ftp.password,
+                host: this.configuration.host,
+                port: this.configuration.port,
+                username: this.configuration.username,
+                password: this.configuration.password,
             });
         }
         return this._client;

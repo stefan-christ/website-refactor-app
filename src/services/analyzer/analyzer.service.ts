@@ -1,16 +1,16 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import { AppConfig, APP_CONFIG } from '../../app-config';
+import { Quit } from '../../quit-exception';
 import { CliService, Option, OPTION_QUIT } from '../cli/cli.service';
-import { CONFIGURATION, Configuration } from '../configuration/configuration';
 import { Directory, File, Link } from '../file-provider/file-model';
 import { FileProviderService } from '../file-provider/file-provider.service';
 import { IoService } from '../io/io.service';
-import { Quit } from '../../quit-exception';
 
 @Injectable()
 export class AnalyzerService {
     constructor(
-        @Inject(CONFIGURATION) private readonly configuration: Configuration,
+        @Inject(APP_CONFIG) private readonly configuration: AppConfig,
         private readonly fileProvider: FileProviderService,
         private readonly io: IoService,
         private readonly cli: CliService,
@@ -50,7 +50,7 @@ export class AnalyzerService {
 
         const optionAll: Option = {
             answer: 'all of the above',
-            choice: 'ALL',
+            choice: 'A',
         };
 
         const optionGoBack = this.cli.getOptionGoBack(origin);

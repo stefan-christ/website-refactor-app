@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CONFIGURATION, Configuration } from '../configuration/configuration';
 
+import { AppConfig, APP_CONFIG } from '../../app-config';
 import { Quit } from '../../quit-exception';
 import { CliService, Option, OPTION_QUIT } from '../cli/cli.service';
 import { Directory } from '../file-provider/file-model';
@@ -24,7 +24,7 @@ export class RefactorService {
     private currentMediaFolder?: string;
 
     constructor(
-        @Inject(CONFIGURATION) private readonly configuration: Configuration,
+        @Inject(APP_CONFIG) private readonly configuration: AppConfig,
         private readonly fileProvider: FileProviderService,
         private readonly io: IoService,
         private readonly cli: CliService,

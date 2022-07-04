@@ -1,9 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { AppConfig, APP_CONFIG } from '../../app-config';
+import { Quit } from '../../quit-exception';
 import { CliService, Option, OPTION_QUIT } from '../cli/cli.service';
-import { CONFIGURATION, Configuration } from '../configuration/configuration';
 import { FtpService } from '../ftp/ftp.service';
 import { IoService } from '../io/io.service';
-import { Quit } from '../../quit-exception';
 import { Directory, File, Tree } from './file-model';
 
 @Injectable()
@@ -16,7 +16,7 @@ export class FileProviderService {
     private currentType?: 'ftp' | 'www' | string;
 
     constructor(
-        @Inject(CONFIGURATION) private readonly configuration: Configuration,
+        @Inject(APP_CONFIG) private readonly configuration: AppConfig,
         private readonly cli: CliService,
         private readonly ftp: FtpService,
         private readonly io: IoService,

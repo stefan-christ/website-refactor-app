@@ -1,20 +1,17 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import { AppConfig, APP_CONFIG } from './app-config';
+import { Quit } from './quit-exception';
 import { AnalyzerService } from './services/analyzer/analyzer.service';
 import { CliService, Option, OPTION_QUIT } from './services/cli/cli.service';
-import {
-    CONFIGURATION,
-    Configuration,
-} from './services/configuration/configuration';
 import { FileProviderService } from './services/file-provider/file-provider.service';
 import { IoService } from './services/io/io.service';
-import { Quit } from './quit-exception';
 import { RefactorService } from './services/refactor/refactor.service';
 
 @Injectable()
 export class AppService {
     constructor(
-        @Inject(CONFIGURATION) private readonly configuration: Configuration,
+        @Inject(APP_CONFIG) private readonly configuration: AppConfig,
         private readonly analyzerService: AnalyzerService,
         private readonly refactorService: RefactorService,
         private readonly fileProvider: FileProviderService,
