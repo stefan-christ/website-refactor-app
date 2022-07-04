@@ -95,10 +95,7 @@ export class RefactorService {
                 includedExtensions: this.configuration.refactor.sourceFileTypes,
             })
         ).filter((sourceFile) => {
-            const filePath = this.fileProvider.relativePath(
-                sourceFile.parentPath + sourceFile.name,
-                tree,
-            );
+            const filePath = this.fileProvider.relativePath(sourceFile, tree);
             return !filePath.startsWith(mediaFolder + tree.pathSeparator);
         });
 
@@ -219,7 +216,7 @@ export class RefactorService {
 
         for (const sourceFile of sourceFiles) {
             const relativeFilePath = this.fileProvider.relativePath(
-                sourceFile.parentPath + sourceFile.name,
+                sourceFile,
                 tree,
             );
 
@@ -230,7 +227,7 @@ export class RefactorService {
                 relativeFilePath,
             );
 
-            const source = await this.report.loadSourceFile(sourceFile);
+            const source = await this.fileProvider.loadSourceFile(sourceFile);
             if (!source) {
                 continue;
             }
@@ -267,7 +264,7 @@ export class RefactorService {
                 command === RefactorCommand.WetRun
             ) {
                 // save the file
-                await this.report.saveSourceFile(
+                await this.fileProvider.saveSourceFile(
                     sourceFile,
                     this.replacer.getData(),
                 );

@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { AppConfig, APP_CONFIG } from '../../app-config';
-import { File } from '../file-provider/file-model';
 import { FileProviderService } from '../file-provider/file-provider.service';
 import { IoService } from '../io/io.service';
 
@@ -20,22 +19,6 @@ export class ReportService {
             .replace(':', '.')
             .substring(0, 19);
         return ts;
-    }
-
-    async saveSourceFile(sourceFile: File, data: string): Promise<void> {
-        const sourceFilePath = this.io.join(
-            sourceFile.parentPath,
-            sourceFile.name,
-        );
-        await this.io.writeTextFile(sourceFilePath, data);
-    }
-
-    async loadSourceFile(sourceFile: File): Promise<string> {
-        const sourceFilePath = this.io.join(
-            sourceFile.parentPath,
-            sourceFile.name,
-        );
-        return this.io.readTextFile(sourceFilePath);
     }
 
     async getReportDirPath(): Promise<string | undefined> {

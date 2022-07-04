@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import ced from 'ced';
 import { AppConfig, APP_CONFIG } from '../../app-config';
 import { Quit } from '../../quit-exception';
 import { CliService, Option, OPTION_QUIT } from '../cli/cli.service';
@@ -8,6 +9,16 @@ import { FileProviderService } from '../file-provider/file-provider.service';
 import { ReportService } from '../report/report.service';
 
 const MENU_NAME = 'ANALYZER MENU';
+
+type Encoding =
+    | 'UTF-8'
+    | 'UTF-32BE'
+    | 'UTF-32LE'
+    | 'UTF-16BE'
+    | 'UTF-16LE'
+    | 'Windows-1252'
+    | 'ISO-8859-1'
+    | 'unclear';
 
 @Injectable()
 export class AnalyzerService {
@@ -150,7 +161,6 @@ export class AnalyzerService {
 
     private async analyzeFileTypes(
         timestamp: string,
-
         recursive: boolean,
     ): Promise<void> {
         const operation = `${timestamp}analyzer-file-types${
@@ -163,27 +173,23 @@ export class AnalyzerService {
         await this.report.writeJsonReport(types, `${operation}.json`);
         console.log('file types in root', types);
 
-        // const analysisDirPath = this.io.join(
-        //     await this.report.getReportDirPath(),
-        //     operation,
-        // );
-
         await this.report.prepareDirectory(operation);
 
         for (let index = 0; index < types.length; index++) {
             const type = types[index];
             const fileIndex = `${index + 1}`.padStart(2, '0');
-            const fileList = await this.fileProvider.listFileNames(tree, {
+            const fileNameList = await this.fileProvider.listFileNames(tree, {
                 recursive,
                 relative: true,
                 includedExtensions: [type],
             });
 
-            const fileName = type === '' ? 'no extension' : type.substring(1);
+            const fileTypeName =
+                type === '' ? 'no extension' : type.substring(1);
             await this.report.writeJsonReport(
-                fileList,
+                fileNameList,
                 operation, // sub directory
-                `${fileIndex}-${fileName}.json`,
+                `${fileIndex}-${fileTypeName}.json`,
             );
         }
     }
@@ -231,7 +237,6 @@ export class AnalyzerService {
             files: File[] | undefined,
             dirs: Directory[] | undefined,
         ) => {
-            //
             reportFiles += findConflicts(parentPath, files);
             reportDirs += findConflicts(parentPath, dirs);
 
@@ -274,45 +279,48 @@ export class AnalyzerService {
             return;
         }
 
-        const sourceFileNames = await this.fileProvider.listFileNames(tree, {
+        const sourceFiles = await this.fileProvider.listFiles(tree, {
             recursive: true,
-            relative: true,
             includedExtensions: this.configuration.refactor.sourceFileTypes,
         });
 
-        const detectFileEncodings = (
-            parentPath: string,
-            files: File[] | undefined,
-            dirs: Directory[] | undefined,
-        ) => {
-            if (files) {
-                for (const file of files) {
-                    // const problematic = getProblematicCharacters(file.name);
-                    // if (problematic) {
-                    //     reportFiles += parentPath + file.name + '\n';
-                    //     reportFiles +=
-                    //         "   '" + problematic.join("'\n   ") + "'\n";
-                    // }
+        let encoding: string | undefined;
+        const result: Record<string, string[]> = {};
+
+        for (const sourceFile of sourceFiles) {
+            const dataBuffer = await this.fileProvider.loadSourceFileAsBuffer(
+                sourceFile,
+            );
+
+            const detected = ced(dataBuffer);
+
+            encoding = detected;
+
+            // if (detected === 'UTF8' || detected === 'ASCII-7-bit') {
+            //     encoding = 'utf-8';
+            // } else if (
+            //     detected === 'CP1250' ||
+            //     detected === 'CP1252' ||
+            //     detected === 'Latin2'
+            // ) {
+            //     encoding = 'windows';
+            // } else {
+            //     encoding = detected;
+            // }
+
+            if (encoding) {
+                if (!result[encoding]) {
+                    result[encoding] = [];
                 }
+                const path = this.fileProvider.relativePath(sourceFile, tree);
+                console.log(path, encoding);
+                result[encoding].push(path);
             }
-            if (dirs) {
-                for (const dir of dirs) {
-                    detectFileEncodings(
-                        parentPath + dir.name + '/',
-                        dir.files,
-                        dir.directories,
-                    );
-                }
-            }
-        };
+        }
 
-        detectFileEncodings('/', tree.files, tree.directories);
-
-        const reportSummary = '';
-
-        await this.report.writeTextReport(
-            reportSummary,
-            `${timestamp}analyzer-file-encodings.md`,
+        await this.report.writeJsonReport(
+            result,
+            `${timestamp}analyzer-file-encodings.json`,
         );
     }
 

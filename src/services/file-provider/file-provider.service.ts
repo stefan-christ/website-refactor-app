@@ -48,6 +48,30 @@ export class FileProviderService {
         return this.currentType;
     }
 
+    async saveSourceFile(sourceFile: File, data: string): Promise<void> {
+        const sourceFilePath = this.io.join(
+            sourceFile.parentPath,
+            sourceFile.name,
+        );
+        await this.io.writeTextFile(sourceFilePath, data);
+    }
+
+    async loadSourceFile(sourceFile: File): Promise<string> {
+        const sourceFilePath = this.io.join(
+            sourceFile.parentPath,
+            sourceFile.name,
+        );
+        return this.io.readTextFile(sourceFilePath);
+    }
+
+    async loadSourceFileAsBuffer(sourceFile: File): Promise<Buffer> {
+        const sourceFilePath = this.io.join(
+            sourceFile.parentPath,
+            sourceFile.name,
+        );
+        return this.io.readTextFileAsBuffer(sourceFilePath);
+    }
+
     doesMediaFolderExist(tree: Tree, mediaFolder: string): boolean {
         const dir = tree.directories?.find((dir) => dir.name === mediaFolder);
         if (!dir) {
@@ -323,23 +347,26 @@ export class FileProviderService {
             includedExtensions: options.includedExtensions,
         });
 
-        let filePaths: string[] = files.map<string>(
-            (file) => file.parentPath + file.name,
-        );
+        let filePaths: string[];
 
         if (options.relative) {
-            filePaths = filePaths.map((filePath) =>
-                this.relativePath(filePath, directory),
+            filePaths = files.map((file) => this.relativePath(file, directory));
+        } else {
+            filePaths = files.map<string>(
+                (file) => file.parentPath + file.name,
             );
         }
 
         return filePaths.sort();
     }
 
-    relativePath(fileOrDirPath: string, rootDir: Directory): string {
-        const normalizedDirPathLength = (rootDir.parentPath + rootDir.name)
-            .length;
-        return fileOrDirPath.substring(normalizedDirPathLength + 1);
+    relativePath(
+        fileOrDirectory: File | Directory,
+        rootDir: Directory,
+    ): string {
+        const path = fileOrDirectory.parentPath + fileOrDirectory.name;
+        const rootPathLen = (rootDir.parentPath + rootDir.name).length;
+        return path.substring(rootPathLen + 1);
     }
 
     private async getRemoteTree(forceRefresh?: boolean): Promise<Tree> {

@@ -83,6 +83,25 @@ export class IoService {
         return this.writeTextFile(filePath, JSON.stringify(data, undefined, 2));
     }
 
+    async readTextFileAsBuffer(filePath: string): Promise<Buffer> {
+        const normalized = path.normalize(filePath);
+
+        return new Promise<Buffer>((resolve, reject) => {
+            fs.readFile(
+                normalized,
+                {
+                    flag: 'r',
+                },
+                (err, data) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(data);
+                    }
+                },
+            );
+        });
+    }
     async readTextFile(filePath: string): Promise<string> {
         const normalized = path.normalize(filePath);
 
