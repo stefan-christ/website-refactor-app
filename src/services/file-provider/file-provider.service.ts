@@ -61,7 +61,10 @@ export class FileProviderService {
                         ')';
                     break;
             }
-            const path = this.io.join(this.configuration.workingDir, dirName);
+            let path = this.io.join(this.configuration.workingDir, dirName);
+            if (this.configuration.timestamp === 'folder') {
+                path = this.io.join(path, this.io.getTimestamp());
+            }
             await this.io.ensureDirectory(path);
             return path;
         }

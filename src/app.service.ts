@@ -50,11 +50,11 @@ export class AppService {
     private async showMainMenu(): Promise<void> {
         const menuName = 'MAIN MENU';
         const optionRefactorSourceFiles: Option = {
-            answer: 'refactor source files',
+            answer: 'Refactor Menu',
             choice: '1',
         };
         const optionAnalyzeFileTypes: Option = {
-            answer: 'analyze file types',
+            answer: 'Analyzer Menu',
             choice: '2',
         };
         const optionFileMenu = this.fileProvider.optionFileMenu;

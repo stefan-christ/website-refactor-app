@@ -19,123 +19,142 @@ export class AnalyzerService {
     async showMainMenu(origin: string): Promise<void> {
         const menuName = 'ANALYZER MENU';
 
-        const optionWriteTreeFile: Option = {
-            answer: 'write tree file',
+        const optionNonRecursively: Option = {
+            answer: 'file types (non-recursive)',
             choice: '1',
         };
-        const optionNonRecursively: Option = {
-            answer: 'non-recursive',
+        const optionRecursively: Option = {
+            answer: 'file types (recursive)', //
             choice: '2',
         };
-        const optionRecursively: Option = {
-            answer: 'recursive', //
+        const optionFindCaseConflicts: Option = {
+            answer: 'case conflicts',
             choice: '3',
         };
-
-        const optionFindCaseConflicts: Option = {
-            answer: 'find case conflicts',
+        const optionFindSymbolicLinks: Option = {
+            answer: 'symbolic links',
             choice: '4',
         };
-        const optionFindSymbolicLinks: Option = {
-            answer: 'find symbolic links',
+        const optionFindProblematicCharacters: Option = {
+            answer: 'problematic characters',
             choice: '5',
         };
-        const optionFindProblematicCharacters: Option = {
-            answer: 'find problematic characters',
-            choice: '6',
-        };
-
         const optionDetectFileEncodings: Option = {
             answer: 'detect file encodings',
+            choice: '6',
+        };
+        const optionWriteTreeFile: Option = {
+            answer: 'file tree',
             choice: '7',
         };
+
+        const optionAll: Option = {
+            answer: 'all of the above',
+            choice: 'ALL',
+        };
+
         const optionGoBack = this.cli.getOptionGoBack(origin);
 
         const optionFileMenu = this.fileProvider.optionFileMenu;
 
-        let treeFile: string;
-        let analysisFile: string;
         const options: Option[] = [
-            optionWriteTreeFile,
             optionNonRecursively,
             optionRecursively,
             optionFindCaseConflicts,
             optionFindSymbolicLinks,
             optionFindProblematicCharacters,
             optionDetectFileEncodings,
+            optionWriteTreeFile,
+            undefined,
+            optionAll,
             undefined,
             optionFileMenu,
             optionGoBack,
             OPTION_QUIT,
         ];
 
-        if (this.fileProvider.getCurrentType() === 'ftp') {
-            analysisFile = 'file-analysis-remote-dir';
-            treeFile = 'file-tree-remote-dir.json';
-        } else if (this.fileProvider.getCurrentType() === 'www') {
-            analysisFile = 'file-analysis-www-dir';
-            treeFile = 'file-tree-www-dir.json';
-        } else {
-            analysisFile = 'file-analysis-custom-dir';
-            treeFile = 'file-tree-custom-dir.json';
-        }
-
         do {
+            let ts = '';
+            if (this.config.timestamp === 'file') {
+                ts = this.io.getTimestamp() + ' ';
+            }
+
             const option = await this.cli.choose(menuName, undefined, options);
+            let optionsToPerform: string[] = [];
+            if (option === optionAll.answer) {
+                optionsToPerform.push(
+                    ...[
+                        optionNonRecursively.answer,
+                        optionRecursively.answer,
+                        optionFindCaseConflicts.answer,
+                        optionFindSymbolicLinks.answer,
+                        optionFindProblematicCharacters.answer,
+                        optionDetectFileEncodings.answer,
+                        optionWriteTreeFile.answer,
+                    ],
+                );
+            } else {
+                optionsToPerform.push(option);
+            }
 
-            switch (option) {
-                case optionWriteTreeFile.answer:
-                    await this.writeTreeFile(treeFile);
-                    break;
-                case optionNonRecursively.answer:
-                    await this.analyzeFileTypes(analysisFile, false);
-                    break;
-                case optionRecursively.answer:
-                    await this.analyzeFileTypes(analysisFile, true);
-                    break;
+            for (const optionToPerform of optionsToPerform) {
+                switch (optionToPerform) {
+                    case optionWriteTreeFile.answer:
+                        await this.writeTreeFile(ts);
+                        break;
+                    case optionNonRecursively.answer:
+                        await this.analyzeFileTypes(ts, false);
+                        break;
+                    case optionRecursively.answer:
+                        await this.analyzeFileTypes(ts, true);
+                        break;
 
-                case optionFindCaseConflicts.answer:
-                    await this.findCaseConflicts();
-                    break;
-                case optionFindSymbolicLinks.answer:
-                    await this.findSymbolicLinkConflicts();
-                    break;
-                case optionFindProblematicCharacters.answer:
-                    await this.findProblematicCharacters();
-                    break;
-                case optionDetectFileEncodings.answer:
-                    // await this.findProblematicCharacters();
-                    break;
+                    case optionFindCaseConflicts.answer:
+                        await this.findCaseConflicts(ts);
+                        break;
+                    case optionFindSymbolicLinks.answer:
+                        await this.findSymbolicLinkConflicts(ts);
+                        break;
+                    case optionFindProblematicCharacters.answer:
+                        await this.findProblematicCharacters(ts);
+                        break;
+                    case optionDetectFileEncodings.answer:
+                        // await this.findProblematicCharacters();
+                        break;
 
-                case optionFileMenu.answer:
-                    await this.fileProvider.showFileMenu({
-                        origin: menuName,
-                    });
-                    break;
-                case optionGoBack.answer:
-                    return;
-                case OPTION_QUIT.answer:
-                    throw Quit;
-                default:
-                    return;
+                    case optionFileMenu.answer:
+                        await this.fileProvider.showFileMenu({
+                            origin: menuName,
+                        });
+                        break;
+                    case optionGoBack.answer:
+                        return;
+                    case OPTION_QUIT.answer:
+                        throw Quit;
+                    default:
+                        return;
+                }
             }
         } while (true);
     }
 
-    private async writeTreeFile(treeFile: string): Promise<void> {
+    private async writeTreeFile(timestamp: string): Promise<void> {
         const tree = await this.fileProvider.getCurrentTree();
         const reportFilePath = this.io.join(
             await this.fileProvider.getReportDirPath(),
-            treeFile,
+            timestamp + 'analyzer-file-tree.json',
         );
         await this.io.writeJsonFile(reportFilePath, tree);
     }
 
     private async analyzeFileTypes(
-        analysisFile: string,
+        timestamp: string,
+
         recursive: boolean,
     ): Promise<void> {
-        const operation = `${analysisFile}${recursive ? '' : '-non'}-recursive`;
+        const operation = `${timestamp}analyzer-file-types${
+            recursive ? '' : '-non'
+        }-recursive`;
 
         const analysisFilePath = this.io.join(
             await this.fileProvider.getReportDirPath(),
@@ -175,7 +194,7 @@ export class AnalyzerService {
         }
     }
 
-    private async findCaseConflicts(): Promise<void> {
+    private async findCaseConflicts(timestamp: string): Promise<void> {
         const tree = await this.fileProvider.getCurrentTree();
         let reportFiles = '';
         let reportDirs = '';
@@ -251,12 +270,12 @@ export class AnalyzerService {
 
         const reportFilePath = this.io.join(
             await this.fileProvider.getReportDirPath(),
-            `case-conflichts.md`,
+            `${timestamp}analyzer-case-conflichts.md`,
         );
         await this.io.writeTextFile(reportFilePath, report);
     }
 
-    private async findProblematicCharacters(): Promise<void> {
+    private async findProblematicCharacters(timestamp: string): Promise<void> {
         const tree = await this.fileProvider.getCurrentTree();
         let reportDirs = '';
         let reportFiles = '';
@@ -327,12 +346,12 @@ export class AnalyzerService {
 
         const reportPath = this.io.join(
             await this.fileProvider.getReportDirPath(),
-            `problematic-characters.md`,
+            `${timestamp}analyzer-problematic-characters.md`,
         );
         await this.io.writeTextFile(reportPath, reportSummary);
     }
 
-    private async findSymbolicLinkConflicts(): Promise<void> {
+    private async findSymbolicLinkConflicts(timestamp: string): Promise<void> {
         const tree = await this.fileProvider.getCurrentTree();
         let report = '';
 
@@ -365,7 +384,7 @@ export class AnalyzerService {
 
         const reportFilePath = this.io.join(
             await this.fileProvider.getReportDirPath(),
-            `symbolic-links.md`,
+            `${timestamp}analyzer-symbolic-links.md`,
         );
         await this.io.writeTextFile(reportFilePath, report);
     }

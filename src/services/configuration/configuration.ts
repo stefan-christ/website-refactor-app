@@ -6,6 +6,7 @@ export const CONFIG: InjectionToken = Symbol('CONFIG');
 export interface Configuration {
     wwwDir?: string;
     workingDir?: string;
+    timestamp?: 'file' | 'folder';
     refactor?: {
         sourceFileTypes?: string[];
         replacementExclusionFileTypes?: string[];

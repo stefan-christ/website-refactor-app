@@ -141,35 +141,35 @@ export class RefactorService {
             sourceFiles,
         );
 
-        let reportDir: string;
+        let reportName: string;
         switch (command) {
             case RefactorCommand.CheckConditions:
-                reportDir = 'refactor-condition-checks';
+                reportName = 'refactor-conditions-check';
                 break;
             case RefactorCommand.DryRun:
-                reportDir = 'refactor-dry-runs';
+                reportName = 'refactor-dry-run';
                 break;
             case RefactorCommand.WetRun:
-                reportDir = 'refactor-wet-runs';
+                reportName = 'refactor-wet-run';
                 break;
 
             default:
-                break;
+                throw new Error('unknown command ' + command);
         }
 
-        const reportDirPath = this.io.join(
-            await this.fileProvider.getReportDirPath(),
-            reportDir,
-        );
+        const reportDirPath = await this.fileProvider.getReportDirPath();
         await this.io.ensureDirectory(reportDirPath);
 
-        const ts = this.io.getTimestamp();
+        let ts = '';
+        if (this.config.timestamp === 'file') {
+            ts = this.io.getTimestamp() + ' ';
+        }
 
         if (!this.reportOperations) {
             this.reportOperations = 'no operations';
         }
         await this.io.writeTextFile(
-            this.io.join(reportDirPath, `${ts} operations.log`),
+            this.io.join(reportDirPath, `${ts}${reportName} operations.log`),
             this.reportOperations,
         );
 
@@ -177,7 +177,7 @@ export class RefactorService {
             this.reportErrors = 'no errors';
         }
         await this.io.writeTextFile(
-            this.io.join(reportDirPath, `${ts} errors.log`),
+            this.io.join(reportDirPath, `${ts}${reportName} errors.log`),
             this.reportErrors,
         );
     }
@@ -316,7 +316,7 @@ export class RefactorService {
         mediaFolder: string,
         origin: string,
     ): Promise<RefactorCommand | 'choose folder' | undefined> {
-        const menuName = 'REFACTORER MENU';
+        const menuName = 'REFACTOR MENU';
 
         const optionCheckConditions: Option = {
             answer: 'Check conditions',
